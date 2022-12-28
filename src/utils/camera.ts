@@ -4,22 +4,16 @@ import fs from 'fs'
 const getLinuxCameras = (cb?: (camPaths: string[]) => unknown) => {
   const req = /^video/i
   const dir = '/dev/'
+  const result = fs.readdirSync(dir)
+  const cameras = result.reduce<string[]>((acc, d) => {
+    if (d.match(req)) acc.push(dir + d)
 
-  fs.readdir(dir, (error, data) => {
-    if (error) {
-      console.error(`Error while reading the dir: ${dir}`, error)
+    return acc
+  }, [])
 
-      throw error
-    }
+  cb?.(cameras)
 
-    const cameras = data.reduce<string[]>((acc, d) => {
-      if (d.match(req)) acc.push(dir + d)
-
-      return acc
-    }, [])
-
-    cb?.(cameras)
-  })
+  return cameras
 }
 
 const getCameras = (cb?: (camPaths: string[]) => unknown) => {

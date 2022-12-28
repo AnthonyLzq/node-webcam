@@ -6,6 +6,7 @@
   "scripts": {
     "test": "node_modules/.bin/mocha test",
     "postinstall": "node ./bin/postinstall.js",
+    "demo": "ts-node examples/websocket/App.js",
     "lint": "eslint --fix . *.js"
   },
   "repository": {

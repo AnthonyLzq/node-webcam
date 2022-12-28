@@ -10,7 +10,7 @@
 
 const Webcam = require('./../Webcam.js')
 const { setDefaults } = require('../utils')
-const Shot = require('./../Shot.js')
+const { Shot } = require('../Shot')
 
 // Main class
 

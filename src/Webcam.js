@@ -13,8 +13,9 @@
 const { exec } = require('child_process')
 const fs = require('fs')
 
-const { getCameras, setDefaults } = require('./utils')1
-const Shot = require('./Shot.js')
+const { getCameras, setDefaults } = require('./utils')
+// eslint-disable-next-line import/extensions
+const { Shot } = require('./Shot')
 
 /*
  * Main class
@@ -101,6 +102,7 @@ Webcam.prototype = {
    * testing purposes)
    *
    */
+  // TODO: mover a FSWebcam
   listControls(callback, stdoutOverride) {
     const scope = this
 
@@ -187,7 +189,7 @@ Webcam.prototype = {
     // Shell execute
 
     const shArgs = {
-      maxBuffer: 1024 * 10000
+      maxBuffer: 1024 * 10_000
     }
 
     exec(sh, shArgs, function (err, out, derr) {
