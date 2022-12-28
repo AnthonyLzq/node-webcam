@@ -2,63 +2,50 @@
  * Mocha Basic capture setups
  *
  */
-"use strict";
+'use strict'
 
-var NodeWebcam = require( "./../index.js" );
+const NodeWebcam = require('./../index.js')
 
-var Path = require( "path" );
+const Path = require('path')
 
-var FS = require( "fs" );
+const FS = require('fs')
 
-var Chai = require( "chai" );
+const Chai = require('chai')
 
-var assert = Chai.assert;
+const assert = Chai.assert
 
+// Main capture sequence
 
-//Main capture sequence
+describe('Capture', function () {
+  // Default webcam capture using global API
 
-describe("Capture", function() {
+  it('Should capture from default webcam', function (done) {
+    this.timeout(6000)
 
+    const url = Path.resolve(__dirname, 'output', 'test_image')
 
-    //Default webcam capture using global API
+    const Webcam = NodeWebcam.capture(url, {}, function (err, url) {
+      assert.typeOf(err, 'null')
 
-    it( "Should capture from default webcam", function( done ) {
+      FS.unlinkSync(url)
 
-        this.timeout( 6000 );
+      done()
+    })
+  })
 
-        var url = Path.resolve( __dirname, "output", "test_image" );
+  // Default webcam capture using global API
 
-        var Webcam = NodeWebcam.capture( url, {}, function( err, url ) {
+  it('Should fail to capture from fake webcam', function (done) {
+    this.timeout(6000)
 
-            assert.typeOf( err, 'null' );
+    const url = Path.resolve(__dirname, 'output', 'test_image')
 
-            FS.unlinkSync( url );
+    const opts = { device: 'OBVIOUSLY-FAKE-WEBCAM' }
 
-            done();
+    const Webcam = NodeWebcam.capture(url, opts, function (err, url) {
+      assert.equal(err instanceof Error, true)
 
-        });
-
-    });
-
-
-    //Default webcam capture using global API
-
-    it( "Should fail to capture from fake webcam", function( done ) {
-
-        this.timeout( 6000 );
-
-        var url = Path.resolve( __dirname, "output", "test_image" );
-
-        var opts = { device: "OBVIOUSLY-FAKE-WEBCAM" };
-
-        var Webcam = NodeWebcam.capture( url, opts, function( err, url ) {
-
-            assert.equal( err instanceof Error, true );
-
-            done();
-
-        });
-
-    });
-
-});
+      done()
+    })
+  })
+})

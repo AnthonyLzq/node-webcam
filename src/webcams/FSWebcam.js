@@ -6,39 +6,32 @@
  * @param Object options
  *
  */
-"use strict";
+'use strict'
 
-var Webcam = require( "./../Webcam.js" );
+const Webcam = require('./../Webcam.js')
 
-var Utils = require( "./../utils/Utils.js" );
+const Utils = require('./../utils/Utils.js')
 
-var Shot = require( "./../Shot.js" );
+const Shot = require('./../Shot.js')
 
+// Main class
 
-//Main class
+function FSWebcam(options) {
+  const scope = this
 
-function FSWebcam( options ) {
+  scope.opts = Utils.setDefaults(options, FSWebcam.Defaults)
 
-    var scope = this;
+  Webcam.call(scope, scope.opts)
 
-    scope.opts = Utils.setDefaults( options, FSWebcam.Defaults );
-
-    Webcam.call( scope, scope.opts );
-
-    if( scope.opts.output === "png" && scope.opts.quality > 9 ) {
-
-        scope.opts.quality = 9;
-
-    }
-
+  if (scope.opts.output === 'png' && scope.opts.quality > 9)
+    scope.opts.quality = 9
 }
 
-FSWebcam.prototype = Object.create( Webcam.prototype );
+FSWebcam.prototype = Object.create(Webcam.prototype)
 
-FSWebcam.prototype.constructor = FSWebcam;
+FSWebcam.prototype.constructor = FSWebcam
 
-FSWebcam.prototype.bin = "fswebcam";
-
+FSWebcam.prototype.bin = 'fswebcam'
 
 /**
  * @override
@@ -47,18 +40,11 @@ FSWebcam.prototype.bin = "fswebcam";
  *
  */
 
-FSWebcam.prototype.createShot = function( location, data ) {
+FSWebcam.prototype.createShot = function (location, data) {
+  if (location === null) var data = Buffer.from(data)
 
-    if( location === null ) {
-
-        var data = Buffer.from( data );
-
-    }
-
-    return new Shot( location, data );
-
-};
-
+  return new Shot(location, data)
+}
 
 /**
  * @override
@@ -68,99 +54,93 @@ FSWebcam.prototype.createShot = function( location, data ) {
  * @param String location
  *
  */
-FSWebcam.prototype.generateSh = function( location ) {
+FSWebcam.prototype.generateSh = function (location) {
+  const scope = this
 
-    var scope = this;
+  const resolution = ' -r ' + scope.opts.width + 'x' + scope.opts.height
 
-    var resolution = " -r "
-        + scope.opts.width + "x" + scope.opts.height;
+  // Adding frame rate
+  const frames = scope.opts.frames ? '-F ' + scope.opts.frames : ''
 
-    // Adding frame rate
-    var frames = scope.opts.frames
-        ? "-F " + scope.opts.frames
-        : "";
+  const output = '--' + scope.opts.output
 
-    var output = "--" + scope.opts.output;
+  const quality = scope.opts.quality
 
-    var quality = scope.opts.quality;
+  const delay = scope.opts.delay ? '-D ' + scope.opts.delay : ''
 
-    var delay = scope.opts.delay
-        ? "-D " + scope.opts.delay
-        : "";
+  const title = scope.opts.title ? '--title ' + scope.opts.title : ''
 
-    var title = scope.opts.title
-        ? "--title " + scope.opts.title
-        : "";
+  const subtitle = scope.opts.subtitle
+    ? '--subtitle ' + scope.opts.subtitle
+    : ''
 
-    var subtitle = scope.opts.subtitle
-        ? "--subtitle " + scope.opts.subtitle
-        : "";
+  const timestamp = scope.opts.timestamp
+    ? '--timestamp ' + scope.opts.timestamp
+    : ''
 
-    var timestamp = scope.opts.timestamp
-        ? "--timestamp " + scope.opts.timestamp
-        : "";
+  const device = scope.opts.device ? '-d ' + scope.opts.device : ''
 
-    var device = scope.opts.device
-        ? "-d " + scope.opts.device
-        : "";
+  const grey = scope.opts.greyscale ? '--greyscale' : ''
 
-    var grey = scope.opts.greyscale
-        ? "--greyscale"
-        : "";
+  const rotation = scope.opts.rotation ? '--rotate ' + scope.opts.rotation : ''
 
-    var rotation = scope.opts.rotation
-        ? "--rotate " + scope.opts.rotation
-        : "";
+  const banner =
+    !scope.opts.topBanner && !scope.opts.bottomBanner
+      ? '--no-banner'
+      : scope.opts.topBanner
+      ? '--top-banner'
+      : '--bottom-banner'
 
-    var banner = ! scope.opts.topBanner && ! scope.opts.bottomBanner
-        ? "--no-banner"
-        : ( scope.opts.topBanner
-            ? "--top-banner"
-            : "--bottom-banner" );
+  const skip = scope.opts.skip ? '--skip ' + scope.opts.skip : ''
 
-    var skip = scope.opts.skip
-        ? "--skip " + scope.opts.skip
-        : "";
+  if (scope.opts.saturation)
+    scope.opts.setValues.Saturation = scope.opts.saturation
 
-    if( scope.opts.saturation ) {
+  const setValues = scope.getControlSetString(scope.opts.setValues)
 
-        scope.opts.setValues.Saturation = scope.opts.saturation;
+  const verbose = scope.opts.verbose ? '' : ' -q'
 
-    }
+  // Use memory if null location
 
+  const shellLocation = location === null ? '- -' : location
 
-    var setValues = scope.getControlSetString( scope.opts.setValues );
+  const sh =
+    scope.bin +
+    ' ' +
+    verbose +
+    ' ' +
+    resolution +
+    ' ' +
+    frames +
+    ' ' +
+    output +
+    ' ' +
+    quality +
+    ' ' +
+    delay +
+    ' ' +
+    title +
+    ' ' +
+    subtitle +
+    ' ' +
+    timestamp +
+    ' ' +
+    device +
+    ' ' +
+    grey +
+    ' ' +
+    rotation +
+    ' ' +
+    banner +
+    ' ' +
+    setValues +
+    ' ' +
+    skip +
+    ' ' +
+    shellLocation
 
-    var verbose = scope.opts.verbose ? "" : " -q"
-
-    // Use memory if null location
-
-    var shellLocation = (location === null)
-        ? "- -"
-        : location;
-
-    var sh = scope.bin + " "
-        + verbose + " "
-        + resolution + " "
-        + frames + " "
-        + output + " "
-        + quality + " "
-        + delay + " "
-        + title + " "
-        + subtitle + " "
-        + timestamp + " "
-        + device + " "
-        + grey + " "
-        + rotation + " "
-        + banner + " "
-        + setValues + " "
-        + skip + " "
-        + shellLocation;
-
-    return sh;
-
-};
-
+  return sh
+}
 
 /**
  * Get control values string
@@ -170,33 +150,24 @@ FSWebcam.prototype.generateSh = function( location ) {
  * @returns {String}
  *
  */
-FSWebcam.prototype.getControlSetString = function( setValues ) {
+FSWebcam.prototype.getControlSetString = function (setValues) {
+  let str = ''
 
-    var str = "";
+  if (typeof setValues !== 'object') return str
 
-    if( typeof( setValues ) !== "object" ) {
+  for (const setName in setValues) {
+    const val = setValues[setName]
 
-        return str;
+    if (!val) continue
 
-    }
+    // Add a space to separate values if there are multiple control values being set
+    if (str.length > 0) str += ' '
 
-    for( var setName in setValues ) {
+    str += `-s ${setName}=${val}`
+  }
 
-        var val = setValues[ setName ];
-
-        if( ! val ) { continue; }
-
-        // Add a space to separate values if there are multiple control values being set
-        if (str.length > 0) {
-            str += " "
-        }
-        str += `-s ${setName}=${val}`;
-
-    }
-
-    return str
-
-};
+  return str
+}
 
 /**
  * Get shell statement to get the available camera controls
@@ -204,16 +175,15 @@ FSWebcam.prototype.getControlSetString = function( setValues ) {
  * @returns {String}
  *
  */
-FSWebcam.prototype.getListControlsSh = function() {
+FSWebcam.prototype.getListControlsSh = function () {
+  const scope = this
 
-    var scope = this;
+  const devSwitch = scope.opts.device
+    ? ' --device=' + scope.opts.device.trim()
+    : ''
 
-    var devSwitch = scope.opts.device ? " --device=" + scope.opts.device.trim() : "";
-
-    return scope.bin + devSwitch + " --list-controls";
-
+  return scope.bin + devSwitch + ' --list-controls'
 }
-
 
 /**
  * Parse output of list camera controls shell command
@@ -224,152 +194,132 @@ FSWebcam.prototype.getListControlsSh = function() {
  * camera controls
  *
  */
-FSWebcam.prototype.parseListControls = function ( stdout, callback ) {
+FSWebcam.prototype.parseListControls = function (stdout, callback) {
+  const cameraControls = []
 
-    var cameraControls = [];
+  let inOptions = false
 
-    var inOptions = false;
+  let prefixLength = 0
 
-    var prefixLength = 0;
+  const headerRegExp = new RegExp(
+    '(?<prefix>.*)------------------\\s+-------------\\s+-----.*'
+  )
 
-    var headerRegExp = new RegExp(
-        "(?<prefix>.*)------------------\\s+-------------\\s+-----.*"
-    );
+  const rangeRegExp = new RegExp(
+    '(?<name>.*?)' +
+      '\\s+-?\\d+(?:\\s+\\(\\d+%\\))?\\s+' +
+      '(?<min>-?\\d+)' +
+      ' - ' +
+      '(?<max>-?\\d+)',
+    'i'
+  )
 
-    var rangeRegExp = new RegExp(
-        "(?<name>.*?)" +
-            "\\s+-?\\d+(?:\\s+\\(\\d+%\\))?\\s+" +
-            "(?<min>-?\\d+)" +
-            " - " +
-            "(?<max>-?\\d+)",
-        "i"
-    );
+  for (let line of stdout.split(/\n|\r|\n\r|\r\n/)) {
+    line = line.slice(prefixLength).trim()
 
-    for ( var line of stdout.split( /\n|\r|\n\r|\r\n/ ) ) {
+    inOptions = inOptions && line.startsWith('-') ? false : inOptions
 
-        line = line.slice( prefixLength ).trim();
+    if (inOptions) {
+      const rangeGroups = line.match(rangeRegExp)
 
-        inOptions = inOptions && line.startsWith( "-" ) ? false : inOptions;
+      if (rangeGroups) {
+        var name = rangeGroups.groups.name
 
-        if ( inOptions ) {
+        const minRange = parseInt(rangeGroups.groups.min)
 
-            var rangeGroups = line.match( rangeRegExp );
+        const maxRange = parseInt(rangeGroups.groups.max)
 
-            if ( rangeGroups ) {
+        cameraControls.push({
+          name,
+          type: 'range',
+          min: minRange,
+          max: maxRange
+        })
+      } else if (line.lastIndexOf('|') !== -1) {
+        const opts = []
 
-                var name = rangeGroups.groups.name;
+        let opt = ''
 
-                var minRange = parseInt( rangeGroups.groups.min );
+        var name = ''
 
-                var maxRange = parseInt( rangeGroups.groups.max );
+        let idx = line.lastIndexOf('|')
 
-                cameraControls.push({
-                    name: name,
-                    type: "range",
-                    min: minRange,
-                    max: maxRange,
-                });
+        while (idx !== -1) {
+          opt = line.slice(idx + 1).trim()
 
-            } else if ( line.lastIndexOf( "|" ) !== -1 ) {
+          opts.push(opt)
 
-                var opts = [];
+          var firstIdx = line.indexOf(opt)
 
-                var opt = "";
+          const lastIdx = line.lastIndexOf(opt)
 
-                var name = "";
+          if (!name && firstIdx !== -1 && firstIdx !== lastIdx) {
+            name = line.slice(0, firstIdx).trim()
 
-                var idx = line.lastIndexOf( "|" );
+            line = line.slice(firstIdx + opt.length)
 
-                while ( idx !== -1 ) {
+            idx = line.lastIndexOf('|')
+          }
 
-                    opt = line.slice( idx + 1 ).trim();
+          line = line.slice(0, idx).trim()
 
-                    opts.push( opt );
-
-                    var firstIdx = line.indexOf( opt );
-
-                    var lastIdx = line.lastIndexOf( opt );
-
-                    if ( !name && firstIdx !== -1 && firstIdx !== lastIdx ) {
-
-                        name = line.slice( 0, firstIdx ).trim();
-
-                        line = line.slice( firstIdx + opt.length );
-
-                        idx = line.lastIndexOf( "|" );
-                    }
-
-                    line = line.slice( 0, idx ).trim();
-
-                    idx = line.lastIndexOf( "|" );
-                }
-
-                if ( name && line.trim() ) {
-
-                    opts.push( line.trim() );
-
-                } else if ( !name ) {
-
-                    // Find largest number of words with two consecutive matches
-
-                    var words = line
-                        .split( " " )
-                        .filter( function ( item ) {
-                            return Boolean( item );
-                        })
-                        .reverse();
-
-                        var num_words = 1;
-
-                        opt = words.slice( 0, num_words ).reverse().join( " " );
-
-                        var re = new RegExp( opt + "\\s+" + opt );
-
-                    while ( !re.test( line ) ) {
-
-                        num_words += 1;
-
-                        opt = words.slice( 0, num_words ).reverse().join( " " );
-
-                        re = new RegExp( opt + "\\s+" + opt );
-                    }
-
-                    var firstIdx = line.indexOf( opt );
-
-                    name = line.slice( 0, firstIdx ).trim();
-
-                    opts.push( opt );
-                }
-
-                cameraControls.push({
-                    name: name,
-                    type: "list",
-                    opts: opts.reverse(),
-                });
-
-            }
-
+          idx = line.lastIndexOf('|')
         }
 
-        var obj = line.match( headerRegExp );
+        if (name && line.trim()) opts.push(line.trim())
+        else if (!name) {
+          // Find largest number of words with two consecutive matches
 
-        if ( obj ) {
+          const words = line
+            .split(' ')
+            .filter(function (item) {
+              return Boolean(item)
+            })
+            .reverse()
 
-            inOptions = true;
+          let num_words = 1
 
-            // The output of the fswebcam --list-controls command has
-            // terminal escape characters at the beginning of the each line
+          opt = words.slice(0, num_words).reverse().join(' ')
 
-            prefixLength = obj.groups.prefix.length;
+          let re = new RegExp(opt + '\\s+' + opt)
 
+          while (!re.test(line)) {
+            num_words += 1
+
+            opt = words.slice(0, num_words).reverse().join(' ')
+
+            re = new RegExp(opt + '\\s+' + opt)
+          }
+
+          var firstIdx = line.indexOf(opt)
+
+          name = line.slice(0, firstIdx).trim()
+
+          opts.push(opt)
         }
 
+        cameraControls.push({
+          name,
+          type: 'list',
+          opts: opts.reverse()
+        })
+      }
     }
 
-    callback && callback( cameraControls );
+    const obj = line.match(headerRegExp)
 
-};
+    if (obj) {
+      inOptions = true
 
+      // The output of the fswebcam --list-controls command has
+      // terminal escape characters at the beginning of the each line
+
+      prefixLength = obj.groups.prefix.length
+    }
+  }
+
+  callback && callback(cameraControls)
+}
 
 /**
  * Data validations based on fs output
@@ -378,53 +328,41 @@ FSWebcam.prototype.parseListControls = function ( stdout, callback ) {
  *
  */
 
-FSWebcam.prototype.runCaptureValidations = function( data ) {
+FSWebcam.prototype.runCaptureValidations = function (data) {
+  if (FSWebcam.Validations.noWebcam.exec(data))
+    return new Error('No webcam found')
 
-    if( FSWebcam.Validations.noWebcam.exec( data ) ) {
+  return null
+}
 
-        return new Error( "No webcam found" );
-
-    }
-
-    return null;
-
-};
-
-
-//Defaults
+// Defaults
 
 FSWebcam.Defaults = {
+  topBanner: false,
 
-    topBanner: false,
+  bottomBanner: false,
 
-    bottomBanner: false,
+  title: false,
 
-    title: false,
+  subTitle: false,
 
-    subTitle: false,
+  timestamp: false,
 
-    timestamp: false,
+  greyscale: false,
 
-    greyscale: false,
+  saturation: false,
 
-    saturation: false,
+  skip: false,
 
-    skip: false,
+  setValues: {}
+}
 
-    setValues: {},
-
-};
-
-
-//Validations const
+// Validations const
 
 FSWebcam.Validations = {
+  noWebcam: /no.*such.*(file|device)/i
+}
 
-    noWebcam: /no.*such.*(file|device)/i
+// Export
 
-};
-
-
-//Export
-
-module.exports = FSWebcam;
+module.exports = FSWebcam

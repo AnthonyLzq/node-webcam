@@ -6,47 +6,42 @@
  * @param Object options
  *
  */
-"use strict";
+'use strict'
 
-var CHILD_PROCESS = require('child_process');
+const CHILD_PROCESS = require('child_process')
 
-var EXEC = CHILD_PROCESS.exec;
+const EXEC = CHILD_PROCESS.exec
 
-var Webcam = require( "./../Webcam.js" );
+const Webcam = require('./../Webcam.js')
 
-var Utils = require( "./../utils/Utils.js" );
+const Utils = require('./../utils/Utils.js')
 
-var Path = require( "path" );
+const Path = require('path')
 
+// Main class
 
-//Main class
+function WindowsWebcam(options) {
+  const scope = this
 
-function WindowsWebcam( options ) {
+  scope.opts = Utils.setDefaults(options, WindowsWebcam.Defaults)
 
-    var scope = this;
+  // Construct
 
-    scope.opts = Utils.setDefaults( options, WindowsWebcam.Defaults );
+  Webcam.call(scope, scope.opts)
 
+  // command cam uses miliseconds
 
-    //Construct
-
-    Webcam.call( scope, scope.opts );
-
-    //command cam uses miliseconds
-
-    scope.opts.delay = scope.opts.delay * 1000;
-
+  scope.opts.delay = scope.opts.delay * 1000
 }
 
-WindowsWebcam.prototype = Object.create( Webcam.prototype );
+WindowsWebcam.prototype = Object.create(Webcam.prototype)
 
-WindowsWebcam.prototype.constructor = WindowsWebcam;
+WindowsWebcam.prototype.constructor = WindowsWebcam
 
-WindowsWebcam.prototype.bin = "\"" + Path.resolve(
-    __dirname, "..", "bindings",
-    "CommandCam", "CommandCam.exe"
-) + "\"";
-
+WindowsWebcam.prototype.bin =
+  '"' +
+  Path.resolve(__dirname, '..', 'bindings', 'CommandCam', 'CommandCam.exe') +
+  '"'
 
 /**
  * @override
@@ -56,27 +51,18 @@ WindowsWebcam.prototype.bin = "\"" + Path.resolve(
  * @param String location
  *
  */
-WindowsWebcam.prototype.generateSh = function( location ) {
+WindowsWebcam.prototype.generateSh = function (location) {
+  const scope = this
 
-    var scope = this;
+  const device = scope.opts.device ? '/devnum ' + scope.opts.device : ''
 
-    var device = scope.opts.device
-        ? "/devnum " + scope.opts.device
-        : "";
+  const delay = scope.opts.delay ? '/delay ' + scope.opts.delay : ''
 
-    var delay = scope.opts.delay
-        ? "/delay " + scope.opts.delay
-        : "";
+  const sh =
+    scope.bin + ' ' + delay + ' ' + device + ' ' + '/filename ' + location
 
-    var sh = scope.bin + " "
-        + delay + " "
-        + device + " "
-        + "/filename " + location;
-
-    return sh;
-
-};
-
+  return sh
+}
 
 /**
  * List webcam devices using bin
@@ -85,57 +71,46 @@ WindowsWebcam.prototype.generateSh = function( location ) {
  *
  */
 
-WindowsWebcam.prototype.list = function( callback ) {
+WindowsWebcam.prototype.list = function (callback) {
+  const scope = this
 
-    var scope = this;
+  const sh = scope.bin + ' /devlist'
 
-    var sh = scope.bin + " /devlist";
+  const cams = []
 
-    var cams = [];
+  EXEC(sh, function (err, data, out) {
+    if (err) throw err
 
-    EXEC( sh, function( err, data, out ) {
+    const lines = out.split('\n')
 
-        if( err ) { throw err; }
+    const ll = lines.length
 
-        var lines = out.split( "\n" );
+    let camNum = 1
 
-        var ll = lines.length;
+    for (let i = 0; i < ll; i++) {
+      let line = lines[i]
+      line = line.replace('\r', '')
 
-        var camNum = 1;
+      if (
+        !!line &&
+        line !== 'Available capture devices:' &&
+        'No video devices found'
+      ) {
+        cams.push(camNum.toString())
+        camNum++
+      }
+    }
 
-        for( var i = 0; i < ll; i ++ ) {
+    callback && callback(cams)
+  })
+}
 
-            var line = lines[ i ];
-            line = line.replace( "\r", "" );
-
-            if(
-                !! line
-                && line !== "Available capture devices:"
-                && "No video devices found"
-            ) {
-
-                cams.push( camNum.toString() );
-                camNum++;
-
-            }
-
-        }
-
-        callback && callback( cams );
-
-    });
-
-};
-
-//Defaults
+// Defaults
 
 WindowsWebcam.Defaults = {
+  output: 'bmp'
+}
 
-    output: "bmp"
+// Export
 
-};
-
-
-//Export
-
-module.exports = WindowsWebcam;
+module.exports = WindowsWebcam

@@ -2,64 +2,46 @@
  * Shared camera utils
  *
  */
-"use strict";
+'use strict'
 
-var OS = require( "os" );
+const OS = require('os')
 
-var FS = require( "fs" );
-
+const FS = require('fs')
 
 var CameraUtils = {
-
-    getCameras: function( callback ) {
-
-        switch( CameraUtils.Platform ) {
-
-            case "linux": case "darwin":
-                return CameraUtils.getLinuxCameras( callback );
-
-
-        }
-
-    },
-
-
-    //Linux cameras read /dev dir
-
-    getLinuxCameras: function( callback ) {
-
-        var reg = /^video/i;
-
-        var dir = "/dev/";
-
-        FS.readdir( dir, function( err, data ) {
-
-            if( err ) { throw err; }
-
-            var cams = [];
-
-            var dl = data.length;
-
-            for( var i = 0; i < dl; i ++ ) {
-
-                var camPath = data[ i ];
-
-                if( camPath.match( reg ) ) {
-
-                    cams.push( dir + camPath );
-
-                }
-
-            }
-
-            callback && callback( cams );
-
-        });
-
+  getCameras(callback) {
+    switch (CameraUtils.Platform) {
+      case 'linux':
+      case 'darwin':
+        return CameraUtils.getLinuxCameras(callback)
     }
+  },
 
-};
+  // Linux cameras read /dev dir
 
-CameraUtils.Platform = OS.platform();
+  getLinuxCameras(callback) {
+    const reg = /^video/i
 
-module.exports = CameraUtils;
+    const dir = '/dev/'
+
+    FS.readdir(dir, function (err, data) {
+      if (err) throw err
+
+      const cams = []
+
+      const dl = data.length
+
+      for (let i = 0; i < dl; i++) {
+        const camPath = data[i]
+
+        if (camPath.match(reg)) cams.push(dir + camPath)
+      }
+
+      callback && callback(cams)
+    })
+  }
+}
+
+CameraUtils.Platform = OS.platform()
+
+module.exports = CameraUtils

@@ -7,48 +7,41 @@
  * @param {Buffer|null} data
  *
  */
-"use strict";
+'use strict'
 
-function Shot( location, data ) {
+function Shot(location, data) {
+  const scope = this
 
-    var scope = this;
-
-    scope.location = location;
-    scope.data = data;
-
-};
+  scope.location = location
+  scope.data = data
+}
 
 Shot.prototype = {
+  constructor: Shot,
 
-    constructor: Shot,
+  /**
+   * Shot location
+   *
+   * @property location
+   *
+   * @type {String|null}
+   *
+   */
 
+  location: null,
 
-    /**
-     * Shot location
-     *
-     * @property location
-     *
-     * @type {String|null}
-     *
-     */
+  /**
+   * Shot data or buffer
+   *
+   * @property data
+   *
+   * @type {Buffer|null}
+   *
+   */
 
-    location: null,
-
-
-    /**
-     * Shot data or buffer
-     *
-     * @property data
-     *
-     * @type {Buffer|null}
-     *
-     */
-
-    data: null
-
-};
-
+  data: null
+}
 
 // Export
 
-module.exports = Shot;
+module.exports = Shot

@@ -2,55 +2,44 @@
  * Capture and dont save use memory
  *
  */
-"use strict";
+'use strict'
 
+const NodeWebcam = require('./../index.js')
 
-var NodeWebcam = require( "./../index.js" );
+const Path = require('path')
 
-var Path = require( "path" );
+const FS = require('fs')
 
-var FS = require( "fs" );
+const Chai = require('chai')
 
-var Chai = require( "chai" );
+const assert = Chai.assert
 
-var assert = Chai.assert;
+// Main capture sequence
 
+describe('Memory Capture', function () {
+  // Default webcam capture using global API
 
-//Main capture sequence
+  it('Should capture and save to memory', function (done) {
+    this.timeout(6000)
 
-describe( "Memory Capture", function() {
+    const opts = {
+      callbackReturn: 'base64'
+    }
 
+    const Webcam = NodeWebcam.capture(null, opts, function (err, data) {
+      assert.typeOf(err, 'null')
 
-    //Default webcam capture using global API
+      assert.typeOf(data, 'string')
 
-    it( "Should capture and save to memory", function( done ) {
+      const writeLocal = __dirname + '/output/test_image_memory_64.html'
 
-        this.timeout( 6000 );
+      const content = "<img src='" + data + "'>"
 
-        var opts = {
-            callbackReturn: "base64"
-        };
+      FS.writeFile(writeLocal, content, function (err) {
+        assert.typeOf(err, 'null')
 
-        var Webcam = NodeWebcam.capture( null, opts, function( err, data ) {
-
-            assert.typeOf( err, "null" );
-
-            assert.typeOf( data, "string" );
-
-            var writeLocal = __dirname + "/output/test_image_memory_64.html";
-
-            var content = "<img src='" + data + "'>";
-
-            FS.writeFile( writeLocal, content, function( err ) {
-
-                assert.typeOf( err, "null" );
-
-                done();
-
-            });
-
-        });
-
-    });
-
-});
+        done()
+      })
+    })
+  })
+})

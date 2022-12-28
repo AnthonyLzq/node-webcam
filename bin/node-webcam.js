@@ -4,199 +4,152 @@
  * Webcam usage CLI
  *
  */
-var NodeWebcam = require( "../" );
+const NodeWebcam = require('../')
 
-var Nopt = require( "nopt" );
+const Nopt = require('nopt')
 
-var Path = require( "path" );
+const Path = require('path')
 
+// Config opts
 
-//Config opts
+const opts = {
+  width: [Number, 1280],
 
-var opts = {
+  height: [Number, 720],
 
-    width: [ Number, 1280 ],
+  delay: [Number, 0],
 
-    height: [ Number, 720 ],
+  device: [String, false],
 
-    delay: [ Number, 0 ],
+  quality: [Number, 100],
 
-    device: [ String, false ],
+  output: [String, 'jpeg'],
 
-    quality: [ Number, 100 ],
+  verbose: [Boolean, true],
 
-    output: [ String, "jpeg" ],
+  help: [Boolean, false],
 
-    verbose: [ Boolean, true ],
+  version: [Boolean, false],
 
-    help: [ Boolean, false ],
+  greyscale: [Boolean, false],
 
-    version: [ Boolean, false ],
+  rotation: [String, false],
 
-    greyscale: [ Boolean, false ],
+  topBanner: [Boolean, false],
 
-    rotation: [ String, false ],
+  bottomBanner: [Boolean, false],
 
-    topBanner: [ Boolean, false ],
+  skip: [Number, 0],
 
-    bottomBanner: [ Boolean, false ],
+  list: [Boolean, false],
 
-    skip: [ Number, 0 ],
+  listControls: [Boolean, false],
 
-    list: [ Boolean, false ],
+  location: Path
+}
 
-    listControls: [ Boolean, false ],
+// Shorthand options
 
-    location: Path,
+const shorthand = {
+  w: ['--width'],
 
-};
+  h: ['--height'],
 
+  D: ['--delay'],
 
-//Shorthand options
+  d: ['--device'],
 
-var shorthand = {
+  q: ['--quality'],
 
-    w: [ "--width" ],
+  out: ['--output'],
 
-    h: [ "--height" ],
+  h: ['--help'],
 
-    D: [ "--delay" ],
+  v: ['--version'],
 
-    d: [ "--device" ],
+  g: ['--greyscale'],
 
-    q: [ "--quality" ],
+  r: ['--rotation'],
 
-    out: [ "--output" ],
+  l: ['--location'],
 
-    h: [ "--help" ],
+  S: ['--skip']
+}
 
-    v: [ "--version" ],
+// Parse options
 
-    g: [ "--greyscale" ],
+const parsedOpts = Nopt(opts, shorthand, process.argv, 2)
 
-    r: [ "--rotation" ],
+// Main
 
-    l: [ "--location" ],
-
-    S: [ "--skip" ]
-
-};
-
-
-//Parse options
-
-var parsedOpts = Nopt( opts, shorthand, process.argv, 2 );
-
-
-//Main
-
-main();
+main()
 
 function main() {
+  // Version text
 
+  if (parsedOpts.version) return version()
 
-    //Version text
+  // Help Text
 
-    if( parsedOpts.version ) {
+  if (parsedOpts.help) return help()
 
-        return version();
+  // Listing cameras helper
 
+  if (parsedOpts.list) return list()
+
+  if (parsedOpts.listControls) return listControls(parsedOpts.device)
+
+  // Location check
+
+  if (!parsedOpts.location) {
+    help()
+
+    console.log(
+      '\n\nNo file location specified. Please use with --l or --location FILE_NAME. QUITING'
+    )
+
+    return
+  }
+
+  // Main capture
+
+  NodeWebcam.capture(parsedOpts.location, parsedOpts, function (err) {
+    if (err) {
+      console.error(err.stack)
+
+      return
     }
 
-
-    //Help Text
-
-    if( parsedOpts.help ) {
-
-        return help();
-
-    }
-
-
-    //Listing cameras helper
-
-    if( parsedOpts.list ) {
-
-        return list();
-
-    }
-
-
-    if( parsedOpts.listControls ) {
-
-        return listControls(parsedOpts.device);
-
-    }
-
-
-
-    //Location check
-
-    if( ! parsedOpts.location ) {
-
-        help();
-
-        console.log( "\n\nNo file location specified. Please use with --l or --location FILE_NAME. QUITING" );
-
-        return;
-
-    }
-
-
-    //Main capture
-
-    NodeWebcam.capture( parsedOpts.location, parsedOpts, function(err) {
-
-        if (err) {
-
-           console.error(err.stack);
-
-           return;
-
-        }
-
-        console.log( "node-webcam success " + parsedOpts.location );
-
-    });
-
+    console.log('node-webcam success ' + parsedOpts.location)
+  })
 }
 
-
-//version display
+// version display
 
 function version() {
-
-    console.log( "node-webcam revision " + NodeWebcam.REVISION );
-
+  console.log('node-webcam revision ' + NodeWebcam.REVISION)
 }
 
-
-//Help text
+// Help text
 
 function help() {
+  console.log('Options')
 
-    console.log( "Options" );
+  console.log('Main', opts)
 
-    console.log( "Main", opts );
-
-    console.log( "Shorthand", shorthand );
-
+  console.log('Shorthand', shorthand)
 }
 
 function list() {
-
-    NodeWebcam.list(function(cams) {
-        console.log("Found cameras");
-        console.log(cams.join("\n"));
-    });
-
+  NodeWebcam.list(function (cams) {
+    console.log('Found cameras')
+    console.log(cams.join('\n'))
+  })
 }
 
 function listControls(device) {
-
-    NodeWebcam.listControls(device, function(controls) {
-        console.log("Listing Controls");
-        console.log(controls);
-    });
-
+  NodeWebcam.listControls(device, function (controls) {
+    console.log('Listing Controls')
+    console.log(controls)
+  })
 }

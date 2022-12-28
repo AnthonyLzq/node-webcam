@@ -2,65 +2,51 @@
  * Factory based on OS output
  *
  */
-var OS = require( "os" );
+const OS = require('os')
 
+// Webcam types
 
-//Webcam types
+const FSWebcam = require('./webcams/FSWebcam.js')
 
-var FSWebcam = require( "./webcams/FSWebcam.js" );
+const ImageSnapWebcam = require('./webcams/ImageSnapWebcam.js')
 
-var ImageSnapWebcam = require( "./webcams/ImageSnapWebcam.js" );
+const WindowsWebcam = require('./webcams/WindowsWebcam.js')
 
-var WindowsWebcam = require( "./webcams/WindowsWebcam.js" );
+// Main singleton
 
+var Factory = new (function () {
+  const scope = this
 
-//Main singleton
+  // Main Class get
 
-var Factory = new function() {
+  scope.create = function (options, type) {
+    const p = type || Factory.Platform
 
-    var scope = this;
+    const Type = Factory.Types[p]
 
+    if (!Type)
+      throw new Error('Sorry, no webcam type specified yet for platform ' + p)
 
-    //Main Class get
+    return new Type(options)
+  }
+})()
 
-    scope.create = function( options, type ) {
+Factory.Platform = OS.platform()
 
-        var p = type || Factory.Platform;
-
-        var Type = Factory.Types[ p ];
-
-        if( ! Type ) {
-
-            throw new Error( "Sorry, no webcam type specified yet for platform " + p );
-
-        }
-
-        return new Type( options );
-
-    };
-
-};
-
-
-Factory.Platform = OS.platform();
-
-//OS Webcam types
+// OS Webcam types
 
 Factory.Types = {
+  linux: FSWebcam,
 
-    linux: FSWebcam,
+  darwin: ImageSnapWebcam,
 
-    darwin: ImageSnapWebcam,
+  fswebcam: FSWebcam,
 
-    fswebcam: FSWebcam,
+  win32: WindowsWebcam,
 
-    win32: WindowsWebcam,
+  win64: WindowsWebcam
+}
 
-    win64: WindowsWebcam
+// Export
 
-};
-
-
-//Export
-
-module.exports = Factory;
+module.exports = Factory

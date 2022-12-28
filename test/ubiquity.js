@@ -2,67 +2,46 @@
  * Class and executable ubiquity
  *
  */
-"use strict";
+'use strict'
 
-var NodeWebcam = require( "./../index.js" );
+const NodeWebcam = require('./../index.js')
 
-var Async = require( "async" );
+const Async = require('async')
 
-var CamTypes = {
+const CamTypes = {
+  linux: ['FSWebcam'],
 
-    linux: [
-        "FSWebcam"
-    ],
+  darwin: ['ImageSnapWebcam'],
 
-    darwin: [
-        "ImageSnapWebcam"
-    ],
+  win32: ['WindowsWebcam'],
 
-    win32: [
-        "WindowsWebcam"
-    ],
+  win64: ['WindowsWebcam']
+}
 
-    win64: [
-        "WindowsWebcam"
-    ]
+// Main test sequence
 
-};
+describe('Webcam Ubiquity', function () {
+  // webcam class ubiquity
 
+  it("Should output from it's platforms drivers", ubiquityTest)
+})
 
-//Main test sequence
+function ubiquityTest(done) {
+  this.timeout(6000)
 
-describe( "Webcam Ubiquity", function() {
+  const platform = NodeWebcam.Factory.Platform
 
+  const types = CamTypes[platform]
 
-    //webcam class ubiquity
+  const url = __dirname + '/output/test_image'
 
-    it( "Should output from it's platforms drivers", ubiquityTest );
+  Async.map(types, captureFromCam, done)
 
-});
+  function captureFromCam(type, callback) {
+    const Webcam = new NodeWebcam[type]()
 
-
-function ubiquityTest( done ) {
-
-    this.timeout( 6000 );
-
-    var platform = NodeWebcam.Factory.Platform;
-
-    var types = CamTypes[ platform ];
-
-    var url = __dirname + "/output/test_image";
-
-    Async.map( types, captureFromCam, done );
-
-    function captureFromCam( type, callback ) {
-
-        var Webcam = new NodeWebcam[ type ];
-
-        Webcam.capture( url, function() {
-
-            callback();
-
-        });
-
-    }
-
+    Webcam.capture(url, function () {
+      callback()
+    })
+  }
 }

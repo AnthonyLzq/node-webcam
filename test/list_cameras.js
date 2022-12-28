@@ -2,93 +2,78 @@
  * Base 64 image test
  *
  */
-"use strict";
+'use strict'
 
-var NodeWebcam = require( "./../index.js" );
+const NodeWebcam = require('./../index.js')
 
-var Path = require( "path" );
+const Path = require('path')
 
-var Chai = require( "chai" );
+const Chai = require('chai')
 
-var assert = Chai.assert;
+const assert = Chai.assert
 
-var Async = require( "async" );
+const Async = require('async')
 
-var List = [];
+let List = []
 
+// Main test sequence
 
-//Main test sequence
+describe('Webcam List', function () {
+  // Default webcam list
 
-describe( "Webcam List", function() {
+  it('Should list all availible cameras', listTest)
 
+  it('Should capture each device', deviceCheck)
+})
 
-    //Default webcam list
+// base 64 capture webcam
 
-    it( "Should list all availible cameras", listTest );
+function listTest(done) {
+  const Webcam = NodeWebcam.Factory.create({})
 
+  Webcam.list(function (list) {
+    console.log('Camera List', list)
 
-    it( "Should capture each device", deviceCheck );
+    List = list
 
-});
-
-
-//base 64 capture webcam
-
-function listTest( done ) {
-
-    var Webcam = NodeWebcam.Factory.create({});
-
-    Webcam.list( function( list ) {
-
-        console.log( "Camera List", list );
-
-        List = list;
-
-        done();
-
-
-    });
-
+    done()
+  })
 }
 
+// use each camera
 
-//use each camera
+function deviceCheck(done) {
+  this.timeout(6000)
 
-function deviceCheck( done ) {
+  const Webcam = NodeWebcam.Factory.create({})
 
-    this.timeout( 6000 );
+  const url = Path.resolve(__dirname, 'output', 'test_image')
 
-    var Webcam = NodeWebcam.Factory.create({});
+  let index = 0
 
-    var url = Path.resolve( __dirname, "output", "test_image" );
+  // Main device capture
 
-     var index = 0;
+  function captureFunc(device, callback) {
+    Webcam.opts.device = device
 
+    const urlDevice = url + '_' + index
 
-    //Main device capture
+    Webcam.capture(urlDevice, function (err, data) {
+      if (
+        err != null &&
+        !err.message.includes(
+          'VIDIOC_ENUMINPUT: Inappropriate ioctl for device'
+        )
+      )
+        assert.typeOf(err, 'null')
 
-    function captureFunc( device, callback ) {
+      callback()
+    })
 
-        Webcam.opts.device = device;
+    index++
+  }
 
-        var urlDevice = url + "_" + index;
-
-        Webcam.capture( urlDevice, function( err, data ) {
-
-            if(err != null && !err.message.includes("VIDIOC_ENUMINPUT: Inappropriate ioctl for device")) assert.typeOf( err, "null" );
-
-            callback();
-
-        });
-
-        index++;
-
-    }
-
-    Async.mapSeries( List, captureFunc, function() {
-
-        done();
-
-    });
-
+  Async.mapSeries(List, captureFunc, function () {
+    done()
+  })
 }

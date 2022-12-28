@@ -5,90 +5,69 @@
  * in memory capturing without saving
  *
  */
-"use strict";
+'use strict'
 
-var port = 9090;
+const port = 9090
 
-var HTTP = require( "http" );
+const HTTP = require('http')
 
-var FS = require( "fs" );
+const FS = require('fs')
 
-var HTML_CONTENT = FS.readFileSync( __dirname + "/www/index.html" );
+const HTML_CONTENT = FS.readFileSync(__dirname + '/www/index.html')
 
-var WS = require( "ws" );
+const WS = require('ws')
 
-var WSS = new WS.Server({ port: 9091 });
+const WSS = new WS.Server({ port: 9091 })
 
 // Broadcast to all.
 
-WSS.broadcast = function broadcast( data ) {
+WSS.broadcast = function broadcast(data) {
+  WSS.clients.forEach(function each(client) {
+    client.send(data)
+  })
+}
 
-    WSS.clients.forEach( function each( client ) {
+const NodeWebcam = require('./../../')
 
-        client.send( data );
-
-    });
-
-};
-
-var NodeWebcam = require( "./../../" );
-
-var Webcam = NodeWebcam.create({
-    callbackReturn: "base64",
-    saveShots: false
-});
-
+const Webcam = NodeWebcam.create({
+  callbackReturn: 'base64',
+  saveShots: false
+})
 
 // Main
 
-init();
+init()
 
 function init() {
+  setupHTTP()
 
-    setupHTTP();
+  setupWebcam()
 
-    setupWebcam();
-
-    console.log( "Visit localhost:9090" );
-
+  console.log('Visit localhost:9090')
 }
 
 function setupHTTP() {
+  const server = HTTP.createServer()
 
-    var server = HTTP.createServer();
+  server.on('request', function (request, response) {
+    response.write(HTML_CONTENT)
 
-    server.on( "request", function( request, response ) {
+    response.end()
+  })
 
-        response.write( HTML_CONTENT );
-
-        response.end();
-
-    });
-
-    server.listen( port );
-
+  server.listen(port)
 }
 
 function setupWebcam() {
+  function capture() {
+    Webcam.capture('picture', function (err, data) {
+      if (err) throw err
 
-    function capture() {
+      WSS.broadcast(data)
 
-        Webcam.capture( "picture", function( err, data ) {
+      setTimeout(capture, 25)
+    })
+  }
 
-            if( err ) {
-
-                throw err;
-
-            }
-
-            WSS.broadcast( data );
-
-            setTimeout( capture, 25 );
-
-        });
-
-    }
-
-    capture();
-
+  capture()
 }

@@ -4,110 +4,86 @@
  * @requires mocha
  *
  */
-"use strict";
+'use strict'
 
-var NodeWebcam = require( "./../index.js" );
+const NodeWebcam = require('./../index.js')
 
-var Chai = require( "chai" );
+const Chai = require('chai')
 
-var assert = Chai.assert;
+const assert = Chai.assert
 
-var Async = require( "async" );
+const Async = require('async')
 
+// Return types to test
 
-//Return types to test
+const ReturnTypes = ['base64', 'buffer', 'location']
 
-var ReturnTypes = [
-    "base64",
-    "buffer",
-    "location"
-];
+const ReturnTypeInstances = {
+  base64: 'string',
+  buffer: 'object',
+  location: 'string'
+}
 
-var ReturnTypeInstances = {
-    "base64": "string",
-    "buffer": "object",
-    "location": "string"
-};
+// Main test sequence
 
+describe('Webcam Callback Return Type', function () {
+  returnTypesTest()
 
-//Main test sequence
-
-describe( "Webcam Callback Return Type", function() {
-
-    returnTypesTest();
-
-    badTypeTest();
-
-});
-
+  badTypeTest()
+})
 
 /**
  * Buffer return types
  */
 
 function returnTypesTest() {
+  Async.map(ReturnTypes, captureFunc)
 
-    Async.map( ReturnTypes, captureFunc );
+  function captureFunc(returnType, callback) {
+    const expectedType = ReturnTypeInstances[returnType]
 
-    function captureFunc( returnType, callback ) {
+    it('Should return ' + returnType + ' on callback', function (itCallback) {
+      this.timeout(6000)
 
-        var expectedType = ReturnTypeInstances[ returnType ];
+      const options = {
+        callbackReturn: returnType
+      }
 
-        it( "Should return " + returnType + " on callback",  function( itCallback ) {
+      const Webcam = NodeWebcam.create(options)
 
-            this.timeout( 6000 );
+      const url = __dirname + '/output/returntype_' + returnType
 
-            var options = {
-                callbackReturn: returnType
-            };
+      Webcam.capture(url, function (err, data) {
+        assert.equal(typeof data, expectedType)
 
-            var Webcam = NodeWebcam.create( options );
+        callback()
 
-            var url = __dirname + "/output/returntype_" + returnType;
-
-            Webcam.capture( url, function( err, data ) {
-
-                assert.equal( typeof( data ), expectedType );
-
-                callback();
-
-                itCallback();
-
-            });
-
-        });
-
-    }
-
+        itCallback()
+      })
+    })
+  }
 }
-
 
 /**
  * Bad type test
  */
 
 function badTypeTest() {
+  it('Should return Error on bad return type on callback', function (itCallback) {
+    this.timeout(6000)
 
-    it( "Should return Error on bad return type on callback",  function( itCallback ) {
+    const options = {
+      callbackReturn: 'OBVISIOUSLY FAKE RETURN TYPE'
+    }
 
-        this.timeout( 6000 );
+    const Webcam = NodeWebcam.create(options)
 
-        var options = {
-            callbackReturn: "OBVISIOUSLY FAKE RETURN TYPE"
-        };
+    const url = __dirname + '/output/returntype_fake'
 
-        var Webcam = NodeWebcam.create( options );
+    Webcam.capture(url, function (err, data) {
+      assert.instanceOf(err, Error)
 
-        var url = __dirname + "/output/returntype_fake";
-
-        Webcam.capture( url, function( err, data ) {
-
-            assert.instanceOf( err, Error );
-
-            itCallback();
-
-        });
-
-    });
-
+      itCallback()
+    })
+  })
 }
