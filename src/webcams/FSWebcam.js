@@ -9,9 +9,7 @@
 'use strict'
 
 const Webcam = require('./../Webcam.js')
-
-const Utils = require('./../utils/Utils.js')
-
+const { setDefaults } = require('../utils')
 const Shot = require('./../Shot.js')
 
 // Main class
@@ -19,7 +17,7 @@ const Shot = require('./../Shot.js')
 function FSWebcam(options) {
   const scope = this
 
-  scope.opts = Utils.setDefaults(options, FSWebcam.Defaults)
+  scope.opts = setDefaults(options, FSWebcam.Defaults)
 
   Webcam.call(scope, scope.opts)
 

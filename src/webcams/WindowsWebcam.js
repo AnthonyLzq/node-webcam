@@ -14,7 +14,7 @@ const EXEC = CHILD_PROCESS.exec
 
 const Webcam = require('./../Webcam.js')
 
-const Utils = require('./../utils/Utils.js')
+const { setDefaults } = require('../utils')
 
 const Path = require('path')
 
@@ -23,7 +23,7 @@ const Path = require('path')
 function WindowsWebcam(options) {
   const scope = this
 
-  scope.opts = Utils.setDefaults(options, WindowsWebcam.Defaults)
+  scope.opts = setDefaults(options, WindowsWebcam.Defaults)
 
   // Construct
 

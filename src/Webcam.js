@@ -10,18 +10,10 @@
  */
 'use strict'
 
-const CHILD_PROCESS = require('child_process')
+const { exec } = require('child_process')
+const fs = require('fs')
 
-const EXEC = CHILD_PROCESS.exec
-
-const FS = require('fs')
-
-const Utils = require('./utils/Utils.js')
-
-const EventDispatcher = require('./utils/EventDispatcher.js')
-
-const CameraUtils = require('./utils/CameraUtils.js')
-
+const { getCameras, setDefaults } = require('./utils')1
 const Shot = require('./Shot.js')
 
 /*
@@ -34,7 +26,7 @@ function Webcam(options) {
 
   scope.shots = []
 
-  scope.opts = Utils.setDefaults(options, Webcam.Defaults)
+  scope.opts = setDefaults(options)
 }
 
 Webcam.prototype = {
@@ -95,7 +87,7 @@ Webcam.prototype = {
    *
    */
 
-  list: CameraUtils.getCameras,
+  list: getCameras,
 
   /**
    * List available camera controls
@@ -126,7 +118,7 @@ Webcam.prototype = {
       maxBuffer: 1024 * 10000
     }
 
-    EXEC(sh, shArgs, function (err, out, derr) {
+    exec(sh, shArgs, function (err, out, derr) {
       if (err) return callback && callback(err)
 
       if (scope.opts.verbose && derr) console.log(derr)
@@ -171,8 +163,7 @@ Webcam.prototype = {
       scope.opts.callbackReturn === Webcam.CallbackReturnTypes.location
     ) {
       console.warn(
-        'If capturing image in memory\
-                your callback return type cannot be the location'
+        'If capturing image in memory your callback return type cannot be the location'
       )
 
       scope.opts.callbackReturn = 'buffer'
@@ -180,7 +171,7 @@ Webcam.prototype = {
 
     const fileType = Webcam.OutputTypes[scope.opts.output]
 
-    var location =
+    const newLocation =
       location === null
         ? null
         : location.match(/\..*$/)
@@ -189,7 +180,7 @@ Webcam.prototype = {
 
     // Shell statement grab
 
-    const sh = scope.generateSh(location)
+    const sh = scope.generateSh(newLocation)
 
     if (scope.opts.verbose) console.log(sh)
 
@@ -199,7 +190,7 @@ Webcam.prototype = {
       maxBuffer: 1024 * 10000
     }
 
-    EXEC(sh, shArgs, function (err, out, derr) {
+    exec(sh, shArgs, function (err, out, derr) {
       if (err) return callback && callback(err)
 
       if (scope.opts.verbose && derr) console.log(derr)
@@ -213,11 +204,9 @@ Webcam.prototype = {
 
       // Callbacks
 
-      const shot = scope.createShot(location, derr)
+      const shot = scope.createShot(newLocation, derr)
 
       if (scope.opts.saveShots) scope.shots.push(shot)
-
-      scope.dispatch({ type: 'capture', shot })
 
       callback && scope.handleCallbackReturnType(callback, shot)
     })
@@ -255,7 +244,7 @@ Webcam.prototype = {
    * @method getShot
    *
    * @param {Number} shot Index of shots called
-   * @param {Function} callback Returns a call from FS.readFile data
+   * @param {Function} callback Returns a call from fs.readFile data
    *
    * @throws Error if shot at index not found
    *
@@ -307,7 +296,7 @@ Webcam.prototype = {
    * @method getShotBuffer
    *
    * @param {Number} shot Index of shots called
-   * @param {Function} callback Returns a call from FS.readFile data
+   * @param {Function} callback Returns a call from fs.readFile data
    *
    * @return {Boolean}
    *
@@ -319,7 +308,7 @@ Webcam.prototype = {
     if (typeof shot === 'number') shot = scope.getShot(shot)
 
     if (shot.location)
-      FS.readFile(shot.location, function (err, data) {
+      fs.readFile(shot.location, function (err, data) {
         callback(err, data)
       })
     else if (!shot.data) callback(new Error('Shot not valid'))
@@ -351,7 +340,7 @@ Webcam.prototype = {
    *
    * @method getBase64
    *
-   * @param {Number|FS.readFile} shot To be converted
+   * @param {Number|fs.readFile} shot To be converted
    * @param {Function( Error|null, Mixed )} callback Returns base64 string
    *
    * @return {String} Dont use
@@ -379,7 +368,7 @@ Webcam.prototype = {
    *
    * @method getBase64
    *
-   * @param {Number|FS.readFile} shot To be converted
+   * @param {Number|fs.readFile} shot To be converted
    * @param {Function( Error|null, Mixed )} callback Returns base64 string
    *
    * @return {String} Dont use
@@ -464,68 +453,6 @@ Webcam.prototype = {
   runCaptureValidations(data) {
     return null
   }
-}
-
-EventDispatcher.prototype.apply(Webcam.prototype)
-
-/**
- * Base defaults for option construction
- *
- * @property Webcam.Defaults
- *
- * @type Object
- * @static
- *
- */
-
-Webcam.Defaults = {
-  // Picture related
-
-  width: 1280,
-
-  height: 720,
-
-  quality: 100,
-
-  // Delay to take shot
-
-  delay: 0,
-
-  // Title of the saved picture
-
-  title: false,
-
-  // Subtitle of the saved picture
-
-  subtitle: false,
-
-  // Timestamp of the saved picture
-
-  timestamp: false,
-
-  // Save shots in memory
-
-  saveShots: true,
-
-  // [jpeg, png] support varies
-  // Webcam.OutputTypes
-
-  output: 'jpeg',
-
-  // Which camera to use
-  // Use Webcam.list() for results
-  // false for default device
-
-  device: false,
-
-  // [location, buffer, base64]
-  // Webcam.CallbackReturnTypes
-
-  callbackReturn: 'location',
-
-  // Logging
-
-  verbose: false
 }
 
 /**

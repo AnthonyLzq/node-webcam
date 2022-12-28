@@ -14,14 +14,14 @@ const EXEC = CHILD_PROCESS.exec
 
 const Webcam = require('./../Webcam.js')
 
-const Utils = require('./../utils/Utils.js')
+const { setDefaults } = require('../utils')
 
 // Main class
 
 function ImageSnapWebcam(options) {
   const scope = this
 
-  scope.opts = Utils.setDefaults(options, ImageSnapWebcam.Defaults)
+  scope.opts = setDefaults(options, ImageSnapWebcam.Defaults)
 
   // Without a delay imagesnap will not work
   // Test on macbook 2015 13' retina
