@@ -1,8 +1,11 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0"
+    />
     <title>Websocket node-webcam example</title>
     <style>
       html,
@@ -28,18 +31,17 @@
 
   <body>
     <div id="container">
-      <img id="img"></img>
+      <img id="img" alt="pussy" />
     </div>
     <script>
-      (function () {
-        "use strict";
-        var container = document.getElementById("container");
-        var img = document.getElementById("img");
-        var ws = new WebSocket("ws://localhost:9091");
-        ws.onmessage = function (data) {
-          img.src = data.data;
-        };
-      })();
+      ;(() => {
+        const img = document.getElementById('img')
+        const ws = new WebSocket('ws://localhost:9091')
+
+        ws.onmessage = data => {
+          img.src = data.data
+        }
+      })()
     </script>
   </body>
 </html>

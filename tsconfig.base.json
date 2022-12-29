@@ -75,7 +75,8 @@
     "src",
     "test",
     "tests",
-    "__test__"
+    "__test__",
+    "examples"
   ],
   "exclude": [
     "node_modules"

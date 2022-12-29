@@ -8,25 +8,25 @@ type WebcamConfig = {
   delay: number // 0
 
   // Title of the saved picture
-  title: boolean // false
+  title: string // ''
 
   // Subtitle of the saved picture
-  subtitle: boolean // false
+  subtitle: string // ''
 
   // Timestamp of the saved picture
-  timestamp: boolean // false
+  timestamp: string // ''
 
   // Save shots in memory
   saveShots: boolean // true
 
   // [jpeg png] support varies
   // Webcam.OutputTypes
-  output: 'jpeg' | 'png' // jpeg
+  output: 'jpeg' | 'png' | 'bmp' // jpeg
 
   // Which camera to use
   // Use Webcam.list() for results
   // false for default device
-  device: string | boolean // false
+  device: string // '
 
   // [location buffer base64]
   // Webcam.CallbackReturnTypes
@@ -34,4 +34,20 @@ type WebcamConfig = {
 
   // Logging
   verbose: boolean // false
+
+  // Frames
+  frames: number // 1
+
+  // Grey scale
+  greyScale: boolean // false
+
+  // Rotation
+  rotation: number // 0
+
+  // Banners
+  topBanner: false
+  bottomBanner: false
+
+  // Skip
+  skip: number // 0
 }

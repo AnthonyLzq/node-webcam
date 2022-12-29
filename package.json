@@ -37,11 +37,11 @@
   "homepage": "https://github.com/chuckfairy/node-webcam#readme",
   "dependencies": {
     "async": "^3.2.4",
-    "nopt": "^7.0.0",
     "ws": "^8.11.0"
   },
   "devDependencies": {
     "@types/node": "^18.11.18",
+    "@types/ws": "^8.5.3",
     "@typescript-eslint/eslint-plugin": "^5.47.1",
     "@typescript-eslint/parser": "^5.47.1",
     "chai": "^4.3.7",

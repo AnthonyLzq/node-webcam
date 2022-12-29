@@ -2,13 +2,11 @@
 const https = require('https')
 const fs = require('fs')
 const os = require('os')
-const config = require('../package.json')
+const { author, name, version } = require('../package.json')
 
-const tag = 'v0.6'
+const tag = `v${version}`
 
-init()
-
-function init() {
+const init = () => {
   // Windows check
   if (!os.platform().match(/win/)) return
 
@@ -16,21 +14,15 @@ function init() {
   const file = fs.createWriteStream('src/bindings/CommandCam/CommandCam.exe')
 
   // Github release url create
-  const repo = config.author.name + '/' + config.name
-  const url =
-    'https://github.com/' +
-    repo +
-    '/releases/download/' +
-    tag +
-    '/CommandCam.exe'
+  const repo = `${author.name}/${name}`
+  const url = `'https://github.com/${repo}/releases/download/${tag}/CommandCam.exe`
 
   // Download exe release
   console.log('Downloading ' + url)
-  makeRequest(url)
 
   function makeRequest(url) {
     https.get(url, function (response) {
-      if (response.statusCode == 302) {
+      if (response.statusCode === 302) {
         console.log('Redirecting ' + response.headers.location)
         makeRequest(response.headers.location)
 
@@ -41,4 +33,8 @@ function init() {
       response.pipe(file)
     })
   }
+
+  makeRequest(url)
 }
+
+init()

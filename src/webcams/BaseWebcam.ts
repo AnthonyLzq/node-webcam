@@ -2,44 +2,46 @@ import { exec } from 'child_process'
 import { promisify } from 'util'
 import { readFileSync } from 'fs'
 
-import { Shot } from './Shot'
+import { Shot } from '../Shot'
 import { getCameras, setDefaults } from 'utils'
 
 const asyncExec = promisify(exec)
 
-type CallbackReturnTypes = {
-  default: string
-  location: string
-  buffer: string
-  base64: string
-}
-
-class Webcam {
+class BaseWebcam {
   #shots: Shot[]
   #options: WebcamConfig
-  #callBackReturnTypes: CallbackReturnTypes
 
   constructor(options?: Partial<WebcamConfig>) {
     this.#shots = []
     this.#options = setDefaults(options)
-    this.#callBackReturnTypes = {
-      default: 'location',
-      location: 'location.jpeg', // Shot location
-      buffer: 'buffer', // Buffer object
-      base64: 'base64' // String ex : "data..."
-    }
+  }
+
+  get options(): WebcamConfig {
+    return Object.assign({}, this.#options)
+  }
+
+  setMaxQuality(): void {
+    this.#options.quality = 9
+  }
+
+  setMaxDelay(): void {
+    this.#options.delay = 1
+  }
+
+  setDelayInMilliseconds(): void {
+    this.#options.delay = this.#options.delay * 1_000
   }
 
   clone() {
-    return new Webcam(this.#options)
+    return new BaseWebcam(this.#options)
   }
 
   clear() {
     this.#shots = []
   }
 
-  list(cb?: (camPaths: string[]) => unknown) {
-    return getCameras(cb)
+  list(): string[] | void {
+    return getCameras()
   }
 
   hasCamera(camera: string) {
@@ -59,27 +61,7 @@ class Webcam {
     return new Shot(location, data)
   }
 
-  async capture(sh: string, location?: string) {
-    if (
-      !location &&
-      this.#options.callbackReturn === this.#callBackReturnTypes.location
-    ) {
-      console.warn(
-        'If capturing image in memory your callback return type cannot be the location'
-      )
-
-      this.#options.callbackReturn = 'buffer'
-    }
-
-    const fileType = this.#options.output
-    const newLocation = !location
-      ? this.#callBackReturnTypes.location
-      : location.match(/\..*$/)
-      ? location
-      : `${location}.${fileType}`
-
-    if (this.#options.verbose) console.log(`File location: ${newLocation}`)
-
+  async capture(sh: string) {
     try {
       await asyncExec(sh, { maxBuffer: 1024 * 10_000 })
     } catch (error) {
@@ -129,4 +111,4 @@ class Webcam {
   }
 }
 
-export { Webcam }
+export { BaseWebcam }

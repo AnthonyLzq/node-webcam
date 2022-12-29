@@ -1,7 +1,7 @@
 import os from 'os'
 import fs from 'fs'
 
-const getLinuxCameras = (cb?: (camPaths: string[]) => unknown) => {
+const getLinuxCameras = () => {
   const req = /^video/i
   const dir = '/dev/'
   const result = fs.readdirSync(dir)
@@ -11,16 +11,14 @@ const getLinuxCameras = (cb?: (camPaths: string[]) => unknown) => {
     return acc
   }, [])
 
-  cb?.(cameras)
-
   return cameras
 }
 
-const getCameras = (cb?: (camPaths: string[]) => unknown) => {
+const getCameras = () => {
   switch (os.platform()) {
     case 'linux':
     case 'darwin':
-      return getLinuxCameras(cb)
+      return getLinuxCameras()
   }
 }
 
