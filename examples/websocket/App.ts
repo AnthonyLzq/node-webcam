@@ -10,9 +10,9 @@ const html = readFileSync(resolve(__dirname, 'www/index.html'))
 const wss = new ws.Server({ port: 9091 })
 
 // Broadcast to all.
-const broadcast = () => {
+const broadcast = (base64Result?: string) => {
   wss.clients.forEach(client => {
-    client.send(resolve(__dirname, '..', '..', 'location.jpeg'))
+    client.send(base64Result)
   })
 }
 
@@ -29,7 +29,7 @@ const setupHTTP = () => {
 
 const setupWebcam = () => {
   setInterval(() => {
-    capture({ cb: broadcast })
+    capture({ cb: broadcast, location: resolve(__dirname, 'location.jpeg') })
   }, 2500)
 }
 

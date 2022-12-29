@@ -61,11 +61,16 @@ class BaseWebcam {
     return new Shot(location, data)
   }
 
-  async capture(sh: string) {
+  async capture(sh: string, path?: string) {
+    console.log('path', path)
     try {
       await asyncExec(sh, { maxBuffer: 1024 * 10_000 })
+
+      if (path) return this.getBase64FromBuffer(readFileSync(path))
     } catch (error) {
       if (this.#options.verbose) console.error('Error while shotting: ', error)
+
+      throw error
     }
   }
 
