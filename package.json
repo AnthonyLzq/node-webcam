@@ -6,8 +6,8 @@
   "scripts": {
     "postinstall": "node ./bin/postinstall.js",
     "demo": "ts-node examples/websocket/App.ts",
-    "lint": "eslint --fix src/**/*.ts",
-    "lint:dist": "eslint --fix dist/* --ext .ts --no-error-on-unmatched-pattern",
+    "lint": "eslint --fix src/*.ts",
+    "lint:dist": "eslint --fix dist/*.ts",
     "prepublish": "tsc && npm run lint:dist",
     "release": "standard-version",
     "version": "npm run release && git add ."
