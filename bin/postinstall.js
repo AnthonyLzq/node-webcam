@@ -11,7 +11,7 @@ const init = () => {
   if (!os.platform().match(/win/)) return
 
   // Bindings path
-  const file = fs.createWriteStream('src/bindings/CommandCam/CommandCam.exe')
+  const file = fs.createWriteStream('dist/bindings/CommandCam/CommandCam.exe')
 
   // Github release url create
   const repo = `${maintainers[0].name}/${name}`.replace('@anthonylzq/', '')

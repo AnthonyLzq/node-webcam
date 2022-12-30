@@ -2,7 +2,6 @@
 import { resolve } from 'path'
 
 import { Factory } from './Factory'
-import type { WebcamTypes } from './Factory'
 import { BaseWebcam, FSWebcam, ImageSnapWebcam, WindowsWebcam } from './webcams'
 import type { WebcamConfig } from './types'
 
