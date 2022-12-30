@@ -4,7 +4,7 @@ import { resolve } from 'path'
 import { platform } from 'os'
 import ws from 'ws'
 
-import { capture } from '../../src/'
+import { capture } from '../../dist/'
 
 const PORT = 9090
 const html = readFileSync(resolve(__dirname, 'www/index.html'))

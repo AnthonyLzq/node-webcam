@@ -8,7 +8,7 @@
     "demo": "ts-node examples/websocket/App.ts",
     "lint": "eslint --fix src/*.ts",
     "lint:dist": "eslint --fix dist/*.ts",
-    "prepublish": "tsc && npm run lint:dist",
+    "prepublish": "tsc && tsc-alias && npm run lint:dist",
     "release": "standard-version",
     "version": "npm run release && git add ."
   },
@@ -58,6 +58,7 @@
     "eslint-plugin-promise": "^6.1.1",
     "standard-version": "^9.5.0",
     "ts-node": "^10.9.1",
+    "tsc-alias": "^1.8.2",
     "typescript": "^4.9.4",
     "ws": "^8.11.0"
   },
