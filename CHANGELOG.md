@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.1.6](https://github.com/AnthonyLzq/node-webcam/compare/v1.1.5...v1.1.6) (2022-12-30)
+
+
+### Bug Fixes
+
+* posinstall bindings location ([78fe9f1](https://github.com/AnthonyLzq/node-webcam/commit/78fe9f16e7ea4e3e1bc06e0231e6151db2a37992))
+
 ### [1.1.5](https://github.com/AnthonyLzq/node-webcam/compare/v1.1.4...v1.1.5) (2022-12-30)
 
 
