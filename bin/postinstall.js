@@ -15,7 +15,7 @@ const init = () => {
 
   // Github release url create
   const repo = `${maintainers[0].name}/${name}`.replace('@anthonylzq/', '')
-  const url = `'https://github.com/${repo}/releases/download/${tag}/CommandCam.exe`
+  const url = `https://github.com/${repo}/releases/download/${tag}/CommandCam.exe`
 
   // Download exe release
   console.log('Downloading ' + url)
