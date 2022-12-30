@@ -37,4 +37,4 @@ const init = () => {
   makeRequest(url)
 }
 
-// init()
+init()
