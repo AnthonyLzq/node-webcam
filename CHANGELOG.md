@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.1.5](https://github.com/AnthonyLzq/node-webcam/compare/v1.1.4...v1.1.5) (2022-12-30)
+
+
+### Features
+
+* updated npmignore file ([a9adaa9](https://github.com/AnthonyLzq/node-webcam/commit/a9adaa9c62ad69ccbbc0489b4b74aabc4dbbc0a5))
+
+
+### Bug Fixes
+
+* building issue using tsc-alias, solution got from https://github.com/Microsoft/TypeScript/issues/15479#issuecomment-660226606 ([cfb8a3c](https://github.com/AnthonyLzq/node-webcam/commit/cfb8a3c4c2333c87c77809e29a2cdd9c13f56c49)), closes [/github.com/Microsoft/TypeScript/issues/15479#issuecomment-660226606](https://github.com/AnthonyLzq//github.com/Microsoft/TypeScript/issues/15479/issues/issuecomment-660226606)
+
 ### [1.1.4](https://github.com/AnthonyLzq/node-webcam/compare/v1.1.3...v1.1.4) (2022-12-30)
 
 
