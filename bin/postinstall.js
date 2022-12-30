@@ -2,7 +2,7 @@
 const https = require('https')
 const fs = require('fs')
 const os = require('os')
-const { author, name, version } = require('../package.json')
+const { maintainers, name, version } = require('../package.json')
 
 const tag = `v${version}`
 
@@ -14,7 +14,7 @@ const init = () => {
   const file = fs.createWriteStream('src/bindings/CommandCam/CommandCam.exe')
 
   // Github release url create
-  const repo = `${author.name}/${name}`
+  const repo = `${maintainers[0].name}/${name}`.replace('@anthonylzq/', '')
   const url = `'https://github.com/${repo}/releases/download/${tag}/CommandCam.exe`
 
   // Download exe release

@@ -5,3 +5,4 @@ tmp/
 .idea
 **/*/location.jpeg
 dist
+src/bindings
