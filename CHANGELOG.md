@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.1.0](https://github.com/AnthonyLzq/node-webcam/compare/v1.0.0...v1.1.0) (2022-12-30)
+
+
+### Features
+
+* updated postinstall ([e89d03f](https://github.com/AnthonyLzq/node-webcam/commit/e89d03f7c9052c1560a6a0b45a101f93ede79b8c))
+
 ## 1.0.0 (2022-12-30)
 
 
