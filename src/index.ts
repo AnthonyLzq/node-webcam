@@ -1,10 +1,12 @@
 /* eslint-disable @typescript-eslint/no-unused-vars, @typescript-eslint/no-empty-function */
+import { resolve } from 'path'
+
 import { Factory } from './Factory'
 import type { WebcamTypes } from './Factory'
 import { BaseWebcam, FSWebcam, ImageSnapWebcam, WindowsWebcam } from './webcams'
-import { resolve } from 'path'
+import type { WebcamConfig } from './types'
 
-const create = (options: Partial<WebcamConfig>, type: keyof WebcamTypes) =>
+const create = (options: Partial<WebcamConfig>, type: string) =>
   new Factory(options).create(type)
 
 const capture = async (
@@ -15,7 +17,7 @@ const capture = async (
     cb = (value?: string) => {}
   }: {
     location?: string
-    type?: keyof WebcamTypes
+    type?: string
     options?: Partial<WebcamConfig>
     cb?: (value?: string) => void
   } = {

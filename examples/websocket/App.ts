@@ -1,7 +1,8 @@
 import http from 'http'
-import ws from 'ws'
 import { readFileSync } from 'fs'
 import { resolve } from 'path'
+import { platform } from 'os'
+import ws from 'ws'
 
 import { capture } from '../../src/'
 
@@ -29,7 +30,11 @@ const setupHTTP = () => {
 
 const setupWebcam = () => {
   setInterval(() => {
-    capture({ cb: broadcast, location: resolve(__dirname, 'location.jpeg') })
+    capture({
+      cb: broadcast,
+      location: resolve(__dirname, 'location.jpeg'),
+      type: platform()
+    })
   }, 2500)
 }
 

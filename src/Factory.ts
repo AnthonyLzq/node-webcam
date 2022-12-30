@@ -1,6 +1,7 @@
 import { platform } from 'os'
 
 import { FSWebcam, ImageSnapWebcam, WindowsWebcam } from './webcams'
+import type { WebcamConfig } from './types'
 
 export type WebcamTypes = {
   linux: FSWebcam
@@ -25,7 +26,7 @@ class Factory {
     }
   }
 
-  create(type: keyof WebcamTypes) {
+  create(type: string) {
     if (!Object.keys(this.#types).includes(type))
       throw new Error('Webcam type is not supported')
 

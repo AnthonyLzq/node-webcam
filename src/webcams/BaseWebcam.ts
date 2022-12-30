@@ -2,8 +2,8 @@ import { exec } from 'child_process'
 import { promisify } from 'util'
 import { readFileSync } from 'fs'
 
-import { Shot } from '../Shot'
-import { getCameras, setDefaults } from 'utils'
+import { Shot, getCameras, setDefaults } from 'utils'
+import type { WebcamConfig } from 'types'
 
 const asyncExec = promisify(exec)
 

@@ -1,4 +1,4 @@
-type WebcamConfig = {
+export type WebcamConfig = {
   // Picture related
   width: number // 1280
   height: number // 720

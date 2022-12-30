@@ -1,3 +1,5 @@
+import type { WebcamConfig } from 'types'
+
 const setDefaults = (
   options: Partial<WebcamConfig> = {},
   defaults: WebcamConfig = {

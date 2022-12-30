@@ -1,6 +1,7 @@
 import { exec } from 'child_process'
 import { promisify } from 'util'
 
+import type { WebcamConfig } from 'types'
 import { BaseWebcam } from './BaseWebcam'
 
 const asyncExec = promisify(exec)

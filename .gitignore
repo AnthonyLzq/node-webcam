@@ -4,3 +4,4 @@ test/output
 tmp/
 .idea
 location.jpeg
+dist
