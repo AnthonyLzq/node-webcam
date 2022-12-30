@@ -2,5 +2,10 @@
 test/output
 tmp/
 .idea
-doc/
 examples/
+src
+.vscode
+.eslintrc
+.gitignore
+CHANGELOG.md
+README
