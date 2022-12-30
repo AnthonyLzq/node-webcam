@@ -62,7 +62,6 @@ class BaseWebcam {
   }
 
   async capture(sh: string, path?: string) {
-    console.log('path', path)
     try {
       await asyncExec(sh, { maxBuffer: 1024 * 10_000 })
 
