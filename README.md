@@ -1,37 +1,34 @@
-# [node-webcam](https://github.com/chuckfairy/node-webcam)
+# [@anthonylzq/node-webcam](https://github.com/AnthonyLzq/node-webcam)
 
 Cross platform webcam usage
 
-
 # Install
 
-
-### Linux
+## Linux
 
 ```
-#Linux relies on fswebcam currently
-#ubuntu
+# Linux relies on fswebcam currently
+# ubuntu
 
 sudo apt-get install fswebcam
 
-#arch
-#fswebcam requires a build from the AUR, it is not listed for installation on pacman/pamac
+# arch
+# fswebcam requires a build from the AUR, it is not listed for installation on pacman/pamac
 
 sudo pamac build fswebcam
 ```
 
-### Mac OSX
+## Mac OSX
 
 ```
-#Mac OSX relies on imagesnap
-#Repo https://github.com/rharder/imagesnap
-#Avaliable through brew
+# Mac OSX relies on imagesnap
+# Repo https://github.com/rharder/imagesnap
+# Available through brew
 
 brew install imagesnap
-
 ```
 
-### Windows
+## Windows
 
 Standalone exe included. See [src/bindings/CommandCam](https://github.com/chuckfairy/node-webcam/tree/master/src/bindings/CommandCam)
 
@@ -40,273 +37,83 @@ Standalone exe included. See [src/bindings/CommandCam](https://github.com/chuckf
 
 ### API Usage
 
-``` javascript
-//Available in nodejs
+The simplest use case:
 
-var NodeWebcam = require( "node-webcam" );
+```ts
+import { platform } from 'os'
+import { capture } from '@anthonylzq/node-webcam'
 
-
-//Default options
-
-var opts = {
-
-    //Picture related
-
-    width: 1280,
-
-    height: 720,
-
-    quality: 100,
-
-    // Number of frames to capture
-    // More the frames, longer it takes to capture
-    // Use higher framerate for quality. Ex: 60
-
-    frames: 60,
-
-
-    //Delay in seconds to take shot
-    //if the platform supports miliseconds
-    //use a float (0.1)
-    //Currently only on windows
-
-    delay: 0,
-
-
-    //Save shots in memory
-
-    saveShots: true,
-
-
-    // [jpeg, png] support varies
-    // Webcam.OutputTypes
-
-    output: "jpeg",
-
-
-    //Which camera to use
-    //Use Webcam.list() for results
-    //false for default device
-
-    device: false,
-
-
-    // [location, buffer, base64]
-    // Webcam.CallbackReturnTypes
-
-    callbackReturn: "location",
-
-
-    //Logging
-
-    verbose: false
-
-};
-
-
-//Creates webcam instance
-
-var Webcam = NodeWebcam.create( opts );
-
-
-//Will automatically append location output type
-
-Webcam.capture( "test_picture", function( err, data ) {} );
-
-
-//Also available for quick use
-
-NodeWebcam.capture( "test_picture", opts, function( err, data ) {
-
-});
-
-
-//Get list of cameras
-
-Webcam.list( function( list ) {
-
-    //Use another device
-
-    var anotherCam = NodeWebcam.create( { device: list[ 0 ] } );
-
-});
-
-//Return type with base 64 image
-
-var opts = {
-    callbackReturn: "base64"
-};
-
-NodeWebcam.capture( "test_picture", opts, function( err, data ) {
-
-    var image = "<img src='" + data + "'>";
-
-});
-```
-
-### Shell Usage
-
-```
-#Config opts
-
---width Picture width
-
---height Picture height
-
---delay Delay till shot
-
---quality Quality of image 0-100
-
---output Output type [png, jpg, bmp]
-
---verbose Verbose debugging
-
---help Usage help text
-
---version node-webcam version
-
---location Location to output webcam capture
-
---list list available camera devices
-
-
-#Shorthand options
-
-w: [ "--width" ],
-
-h: [ "--height" ],
-
-d: [ "--delay" ],
-
-q: [ "--quality" ],
-
-out: [ "--output" ],
-
-h: [ "--help", true ],
-
-v: [ "--version", true ],
-
-l: [ "--location" ]
-
-
-#node-webcam will auto output the file type at the end
-
-node-webcam --w 500 --h 500 --d 2 --l picture # ./bin/node-webcam.js
-
-```
-
-# Generated Documentation
-
-```
-# install yuidoc and run
-./bin/generate_doc.sh
-```
-
-
-# Classes
-
-## [NodeWebcam](https://github.com/chuckfairy/node-webcam/blob/master/index.js)
-
-Main require used. Also has helper functions just for you.
-
-### NodeWebcam.create( Object options )
-
-Main factory creation of a webcam for use. Uses NodeWebcam.Factory to create.
-
-```javascript
-//Default options defined in API usage
-
-var NodeWebcam = require( "node-webcam" );
-
-var Webcam = NodeWebcam.create({});
-```
-
-### NodeWebcam.capture( String location, Object options, Function callback )
-
-Quick helper for taking pictures via one function. Will return Webcam instance via NodeWebcam.create.
-
-```javascript
-NodeWebcam.capture( "my_picture", {}, function( err, data ) {
-
-    if ( !err ) console.log( "Image created!" );
-
-});
-```
-
-## [Webcam](https://github.com/chuckfairy/node-webcam/blob/master/src/Webcam.js)
-
-Base webcam class in which all other cameras inherit from
-
-### Webcam.constructor( Object options )
-
-```javascript
-//Default options and basic usage
-
-var opts = {
-
-    width: 1280,
-
-    height: 720,
-
-    delay: 0,
-
-    quality: 100,
-
-    // [jpeg, png] support varies
-    // Webcam.OutputTypes
-
-    output: "jpeg",
-
-    device: false,
-
-
-    // [buffer, base64]
-    // Webcam.CallbackReturnTypes
-
-    callbackReturn: "location",
-
-    verbose: false
-
+const callback = (base64Result: string) => {
+  console.log('base64Result', base64Result)
 }
 
-var cam = new Webcam( opts );
+const main = async () => {
+  await capture({
+    cb: callback,
+    location: resolve(__dirname, 'picture.jpeg'),
+    type: platform()
+  })
+}
 ```
 
-### Webcam.clone()
+In case you need something more advance you can use the `create` function that will give you a class that will handle the usage of the webcam for you.
 
-### Webcam.clear()
+```ts
+import { platform } from 'os'
+import { create } from '@anthonylzq/node-webcam'
 
-Reset data and memory of past shots
-
-### Webcam.capture( String location, Object options, Function callback( Error|Null, Buffer) )
-
-First param of callback will be a possible error or null. Second will return the location of the image or null. The following functions will follow similarly. This function will auto append the output type if not specified in file name.
-
-
-### Webcam.getShot( Number shot, Function callback( Error|Null, Buffer) )
-
-### Webcam.getLastShot( Function callback )
-
-### Webcam.getBase64( Number|Buffer shot, Function callback( Error|Null, Buffer) )
-
-Get base 64 of shot number or data already grabbed from FS.
-
-## [FSWebcam](https://github.com/chuckfairy/node-webcam/blob/master/src/webcams/FSWebcam.js)
-
-Uses the fswebcam program. Available in linux (apt-get install fswebcam). Extra program addons provided in options.
-
-```javascript
-var NodeWebcam = require( "node-webcam" );
-
-var FSWebcam = NodeWebcam.FSWebcam; //require( "node-webcam/webcams/FSWebcam" );
-
-var opts = {};
-
-var cam = new FSWebcam( opts );
+// The supported platforms are: linux, darwin, win32 and win64. Besides you can use 'fswebcam' as second parameter instead of "platform()"
+const Webcam = create({}, platform())
 ```
 
-# What's next?
+In case you want to list the available cameras in your OS, you can use the `list` function:
 
-* Video capture functionality
-* Battle testing
-* What do you want to see? Leave an issue on the github page!
+```ts
+import { platform } from 'os'
+import { create } from '@anthonylzq/node-webcam'
+
+const cameras = create({}, platform())
+```
+
+The default configuration for all the webcams classes and methods can be found in the `defaults` object:
+
+```ts
+import { platform } from 'os'
+import { defaults } from '@anthonylzq/node-webcam'
+
+console.log(defaults)
+/**
+ * {
+ *   width: 1280,
+ *   height: 720,
+ *   quality: 100,
+ *   delay: 0,
+ *   title: '',
+ *   subtitle: '',
+ *   timestamp: '',
+ *   saveShots: true,
+ *   output: 'jpeg',
+ *   device: '',
+ *   callbackReturn: 'location',
+ *   verbose: false,
+ *   frames: 1,
+ *   greyScale: false,
+ *   rotation: 0,
+ *   bottomBanner: false,
+ *   topBanner: false,
+ *   skip: 0
+ * }
+ */
+```
+
+## Author
+
+- **Charlie Abeling** - _Initial Work_ - _Documentation_ - [chuckfairy](https://github.com/chuckfairy).
+
+## Maintainers
+
+- **Anthony Luzquiños** - _Rework_ - _Documentation_ - [AnthonyLzq](https://github.com/AnthonyLzq).
+
+<!-- ## Contributors
+
+- **Andree Anchi** - _Bug reports_ - [andreewaD](https://github.com/andreewD). -->

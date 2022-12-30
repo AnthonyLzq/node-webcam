@@ -34,7 +34,7 @@ const capture = async (
   cb(base64Result)
 }
 
-const list = (type: keyof WebcamTypes) => create({}, type).list()
+const list = (type: string) => create({}, type).list()
 
 export {
   create,
@@ -46,5 +46,6 @@ export {
   ImageSnapWebcam,
   WindowsWebcam
 }
+export { defaults } from './utils'
 
 export type NodeWebcamConfig = WebcamConfig
