@@ -1,6 +1,6 @@
 {
   "name": "@anthonylzq/node-webcam",
-  "version": "1.1.6",
+  "version": "1.1.7",
   "description": "Cross platform webcam capture",
   "main": "dist/index.js",
   "scripts": {
