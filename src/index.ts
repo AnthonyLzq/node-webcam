@@ -13,24 +13,33 @@ const capture = async (
     location = 'location.jpeg',
     type = 'linux',
     options = {},
-    cb = (value?: string) => {}
+    cb = (value?: string | Buffer) => {},
+    returnType = 'base64'
   }: {
     location?: string
     type?: string
     options?: Partial<WebcamConfig>
-    cb?: (value?: string) => void
+    cb?: (value?: string | Buffer) => void
+    returnType?: 'base64' | 'buffer'
   } = {
     location: 'location.jpeg',
     type: 'linux',
     options: {},
-    cb: (value?: string) => {}
+    cb: (value?: string | Buffer) => {},
+    returnType: 'base64'
   }
 ) => {
   const Webcam = create(options, type)
   const path = resolve(__dirname, location)
-  const base64Result = await Webcam.capture(Webcam.generateSh(location), path)
+  const result = await Webcam.capture(
+    Webcam.generateSh(location),
+    path,
+    returnType
+  )
 
-  cb(base64Result)
+  cb(result)
+
+  return result
 }
 
 const list = (type: string) => create({}, type).list()

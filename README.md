@@ -2,7 +2,7 @@
 
 Cross platform webcam usage
 
-# Install
+## Install
 
 ## Linux
 
@@ -32,79 +32,97 @@ brew install imagesnap
 
 Standalone exe included. See [src/bindings/CommandCam](https://github.com/chuckfairy/node-webcam/tree/master/src/bindings/CommandCam)
 
-
-# Usage
+## Usage
 
 ### API Usage
 
-The simplest use case:
+- The simplest use case:
 
-```ts
-import { platform } from 'os'
-import { capture } from '@anthonylzq/node-webcam'
+  ```ts
+  import { platform } from 'os'
+  import { capture } from '@anthonylzq/node-webcam'
 
-const callback = (base64Result: string) => {
-  console.log('base64Result', base64Result)
-}
+  const main = async () => {
+    // base64 as default
+    const result = await capture({
+      location: resolve(__dirname, 'picture.jpeg'),
+      type: platform()
+    })
 
-const main = async () => {
-  await capture({
-    cb: callback,
-    location: resolve(__dirname, 'picture.jpeg'),
-    type: platform()
-  })
-}
-```
+    console.log('result', result)
+  }
+  ```
 
-In case you need something more advance you can use the `create` function that will give you a class that will handle the usage of the webcam for you.
+- In case you want to use another file type such as `jpg`, `png` or `bmp` you **must** indicate it in the `options` object, otherwise you will get an error:
 
-```ts
-import { platform } from 'os'
-import { create } from '@anthonylzq/node-webcam'
+  ```ts
+  import { platform } from 'os'
+  import { capture } from '@anthonylzq/node-webcam'
 
-// The supported platforms are: linux, darwin, win32 and win64. Besides you can use 'fswebcam' as second parameter instead of "platform()"
-const Webcam = create({}, platform())
-```
+  const main = async () => {
+    const result = await capture({
+      location: resolve(__dirname, 'picture.png'),
+      type: platform(),
+      returnType: 'buffer'
+      options: {
+        output: 'png'
+      }
+    })
 
-In case you want to list the available cameras in your OS, you can use the `list` function:
+    console.log('result', result)
+  }
+  ```
 
-```ts
-import { platform } from 'os'
-import { create } from '@anthonylzq/node-webcam'
+  This is because in order to build properly the base64 image both attributes must match.
 
-const cameras = create({}, platform())
-```
+- In case you need something more advance you can use the `create` function that will give you a class that will handle the usage of the webcam for you.
 
-The default configuration for all the webcams classes and methods can be found in the `defaults` object:
+  ```ts
+  import { platform } from 'os'
+  import { create } from '@anthonylzq/node-webcam'
 
-```ts
-import { platform } from 'os'
-import { defaults } from '@anthonylzq/node-webcam'
+  // The supported platforms are: linux, darwin, win32 and win64.
+  // Besides you can use 'fswebcam' as second parameter instead of "platform()"
+  const Webcam = create({}, platform())
+  ```
 
-console.log(defaults)
-/**
- * {
- *   width: 1280,
- *   height: 720,
- *   quality: 100,
- *   delay: 0,
- *   title: '',
- *   subtitle: '',
- *   timestamp: '',
- *   saveShots: true,
- *   output: 'jpeg',
- *   device: '',
- *   callbackReturn: 'location',
- *   verbose: false,
- *   frames: 1,
- *   greyScale: false,
- *   rotation: 0,
- *   bottomBanner: false,
- *   topBanner: false,
- *   skip: 0
- * }
- */
-```
+- In case you want to list the available cameras in your OS, you can use the `list` function:
+
+  ```ts
+  import { platform } from 'os'
+  import { create } from '@anthonylzq/node-webcam'
+
+  const cameras = create({}, platform())
+  ```
+
+- The default configuration for all the webcams classes and methods can be found in the `defaults` object:
+
+  ```ts
+  import { defaults } from '@anthonylzq/node-webcam'
+
+  console.log(defaults)
+  /**
+   * {
+   *   width: 1280,
+   *   height: 720,
+   *   delay: 0,
+   *   title: '',
+   *   subtitle: '',
+   *   timestamp: '',
+   *   saveShots: true,
+   *   output: 'jpeg',
+   *   device: '',
+   *   callbackReturn: 'location',
+   *   verbose: false,
+   *   frames: 1,
+   *   greyScale: false,
+   *   rotation: 0,
+   *   bottomBanner: false,
+   *   topBanner: false,
+   *   skip: 0
+   * }
+   */
+  ```
 
 ## Author
 

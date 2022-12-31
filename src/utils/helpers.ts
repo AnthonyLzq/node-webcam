@@ -11,7 +11,6 @@ const defaults: WebcamConfig = {
   saveShots: true,
   output: 'jpeg',
   device: '',
-  callbackReturn: 'location',
   verbose: false,
   frames: 1,
   greyScale: false,

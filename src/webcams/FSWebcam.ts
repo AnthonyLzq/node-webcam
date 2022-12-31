@@ -15,8 +15,6 @@ class FSWebcam extends BaseWebcam {
     const options = super.options
     const resolution = ` -r ${options.width}x${options.height}`
     const frames = `-F ${options.frames}`
-    const output = `--${options.output}`
-    const { quality } = options
     const delay = `-D ${options.delay}`
     const title = options.title ? `--title ${options.title}` : ''
     const subtitle = options.subtitle ? `--subtitle ${options.subtitle}` : ''
@@ -38,7 +36,7 @@ class FSWebcam extends BaseWebcam {
 
     return `${
       this.#bin
-    } ${verbose} ${resolution} ${frames} ${output} ${quality} ${delay} ${title} ${subtitle} ${timestamp} ${device} ${grey} ${rotation} ${banner} ${skip} ${shellLocation}`.replace(
+    } ${verbose} ${resolution} ${frames} ${delay} ${title} ${subtitle} ${timestamp} ${device} ${grey} ${rotation} ${banner} ${skip} ${shellLocation}`.replace(
       / +/g,
       ' '
     )

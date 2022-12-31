@@ -21,16 +21,12 @@ export type WebcamConfig = {
 
   // [jpeg png] support varies
   // Webcam.OutputTypes
-  output: 'jpeg' | 'png' | 'bmp' // jpeg
+  output: 'jpeg' | 'jpg' | 'png' | 'bmp' // jpeg
 
   // Which camera to use
   // Use Webcam.list() for results
   // false for default device
   device: string // '
-
-  // [location buffer base64]
-  // Webcam.CallbackReturnTypes
-  callbackReturn: 'location' | 'buffer' | 'base64' // 'location'
 
   // Logging
   verbose: boolean // false

@@ -6,6 +6,8 @@ import { Shot, getCameras, setDefaults } from 'utils'
 import type { WebcamConfig } from 'types'
 
 const asyncExec = promisify(exec)
+const r = /(?<=\.)[^.]*$/
+const ALLOWED_FILE_TYPES = ['jpg', 'jpeg', 'png', 'bmp']
 
 class BaseWebcam {
   #shots: Shot[]
@@ -61,11 +63,36 @@ class BaseWebcam {
     return new Shot(location, data)
   }
 
-  async capture(sh: string, path?: string) {
+  async capture(sh: string, path: string, returnType: 'buffer' | 'base64') {
+    const match = path.match(r)
+
+    if (!match) throw new Error('Invalid path, missing type file')
+
+    if (!match[0]) throw new Error(`Invalid type extension: ${match[0]}`)
+
+    if (!ALLOWED_FILE_TYPES.includes(match[0]))
+      throw new Error(`Invalid file extension: ${match[0]}`)
+
+    if (this.#options.output !== match[0])
+      throw new Error(
+        `The output (${this.#options.output}) and the file type (${
+          match[0]
+        }) does not match`
+      )
+
     try {
       await asyncExec(sh, { maxBuffer: 1024 * 10_000 })
 
-      if (path) return this.getBase64FromBuffer(readFileSync(path))
+      const buffer = readFileSync(path)
+
+      switch (returnType) {
+        case 'buffer':
+          return buffer
+        case 'base64':
+          return this.getBase64FromBuffer(buffer)
+        default:
+          throw new Error(`Invalid returnType: ${returnType}`)
+      }
     } catch (error) {
       if (this.#options.verbose) console.error('Error while shotting: ', error)
 

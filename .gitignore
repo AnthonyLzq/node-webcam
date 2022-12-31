@@ -3,6 +3,7 @@ node_modules/
 test/output
 tmp/
 .idea
-**/*/location.jpeg
+**/*/location.*
+**/*/picture.*
 dist
 src/bindings
