@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [2.0.0](https://github.com/AnthonyLzq/node-webcam/compare/v1.1.7...v2.0.0) (2022-12-31)
+
+
+### Features
+
+* removed callback support, removed quality attribute, returning image as base64 or Buffer and updated docs ([0e93934](https://github.com/AnthonyLzq/node-webcam/commit/0e93934d796d910d1d64c9b5dce8bb9ff098e9f1))
+
 ### [1.1.7](https://github.com/AnthonyLzq/node-webcam/compare/v1.1.6...v1.1.7) (2022-12-30)
 
 
