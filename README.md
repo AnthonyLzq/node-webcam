@@ -4,7 +4,7 @@ Cross platform webcam usage
 
 ## Install
 
-## Linux
+### Linux
 
 ```
 # Linux relies on fswebcam currently
@@ -18,7 +18,7 @@ sudo apt-get install fswebcam
 sudo pamac build fswebcam
 ```
 
-## Mac OSX
+### Mac OSX
 
 ```
 # Mac OSX relies on imagesnap
@@ -28,7 +28,7 @@ sudo pamac build fswebcam
 brew install imagesnap
 ```
 
-## Windows
+### Windows
 
 Standalone exe included. See [src/bindings/CommandCam](https://github.com/chuckfairy/node-webcam/tree/master/src/bindings/CommandCam)
 
