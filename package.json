@@ -8,9 +8,10 @@
     "demo": "npm run prepublish && ts-node examples/websocket/App.ts",
     "lint": "eslint --fix src --ext .ts",
     "lint:dist": "eslint --fix dist --ext .ts",
-    "prepublish": "tsc && tsc-alias && cp -r src/bindings dist && npm run lint:dist",
+    "prepare": "npm run rm:dist && tsc && tsc-alias && cp -r src/bindings dist && npm run lint:dist",
     "release": "standard-version",
-    "version": "npm run release && git add ."
+    "version": "npm run release && git add .",
+    "rm:dist": "if [ -d \"dist\" ]; then rm -rf dist; fi"
   },
   "repository": {
     "type": "git",

@@ -31,7 +31,7 @@ const setupHTTP = () => {
 const setupWebcam = () => {
   setInterval(async () => {
     const result = await capture({
-      location: resolve(__dirname, 'location.png'),
+      location: resolve(__dirname, 'picture.png'),
       type: platform(),
       options: {
         output: 'png'
