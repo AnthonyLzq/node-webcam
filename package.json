@@ -5,7 +5,7 @@
   "main": "dist/index.js",
   "scripts": {
     "postinstall": "node ./bin/postinstall.js",
-    "demo": "npm run prepublish && ts-node examples/websocket/App.ts",
+    "demo": "npm run prepare && ts-node examples/websocket/App.ts",
     "lint": "eslint --fix src --ext .ts",
     "lint:dist": "eslint --fix dist --ext .ts",
     "prepare": "npm run rm:dist && tsc && tsc-alias && cp -r src/bindings dist && npm run lint:dist",
