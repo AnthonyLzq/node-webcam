@@ -37,7 +37,7 @@ const capture = async (
     returnType
   )
 
-  cb(result)
+  cb?.(result)
 
   return result
 }
