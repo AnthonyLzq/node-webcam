@@ -1,5 +1,4 @@
 import { execFile } from 'child_process'
-import { readFileSync } from 'fs'
 import { readFile } from 'fs/promises'
 import { promisify } from 'util'
 
@@ -267,6 +266,8 @@ class BaseWebcam {
       throw typedError
     }
 
+    if (this.#options.saveShots) this.#shots.push(this.createShot(path, buffer))
+
     this.logDiagnostic(
       'capture:success',
       {
@@ -294,19 +295,19 @@ class BaseWebcam {
   }
 
   getLastShot(): Shot {
-    return this.#shots[this.#shots.length - 1]
+    return this.getShot(this.#shots.length - 1)
   }
 
   getShotBuffer(index: number): Buffer {
     const shot = this.getShot(index)
 
-    return readFileSync(shot.location)
+    return shot.data
   }
 
   getLastShotBuffer(): Buffer {
     const shot = this.getLastShot()
 
-    return readFileSync(shot.location)
+    return shot.data
   }
 
   getBase64FromBuffer(shotBuffer: Buffer) {

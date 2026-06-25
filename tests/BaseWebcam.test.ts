@@ -289,6 +289,90 @@ describe('BaseWebcam', () => {
     }
   })
 
+  it('saves captured shots in memory by default', async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'node-webcam-'))
+    const path = join(directory, 'photo.png')
+    const webcam = new BaseWebcam({ output: 'png' })
+
+    try {
+      await webcam.capture(
+        {
+          file: process.execPath,
+          args: ['-e', writeFixtureImageScript, path]
+        },
+        path,
+        'buffer'
+      )
+
+      const shot = webcam.getLastShot()
+
+      assert.equal(shot.location, path)
+      assert.deepEqual([...shot.data], [1, 2, 3])
+      assert.deepEqual([...webcam.getLastShotBuffer()], [1, 2, 3])
+      assert.deepEqual([...webcam.getShotBuffer(0)], [1, 2, 3])
+      assert.equal(webcam.getLastShotBase64(), 'data:image/png;base64,AQID')
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
+  })
+
+  it('does not retain captured buffers when saveShots is false', async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'node-webcam-'))
+    const path = join(directory, 'photo.png')
+    const webcam = new BaseWebcam({ output: 'png', saveShots: false })
+
+    try {
+      await webcam.capture(
+        {
+          file: process.execPath,
+          args: ['-e', writeFixtureImageScript, path]
+        },
+        path,
+        'buffer'
+      )
+
+      assert.throws(() => webcam.getLastShot(), {
+        code: 'SHOT_NOT_FOUND',
+        message: 'Index out of bonds',
+        name: 'WebcamError'
+      })
+      assert.throws(() => webcam.getLastShotBuffer(), {
+        code: 'SHOT_NOT_FOUND',
+        message: 'Index out of bonds',
+        name: 'WebcamError'
+      })
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
+  })
+
+  it('clears retained shots', async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'node-webcam-'))
+    const path = join(directory, 'photo.png')
+    const webcam = new BaseWebcam({ output: 'png' })
+
+    try {
+      await webcam.capture(
+        {
+          file: process.execPath,
+          args: ['-e', writeFixtureImageScript, path]
+        },
+        path,
+        'buffer'
+      )
+
+      webcam.clear()
+
+      assert.throws(() => webcam.getLastShot(), {
+        code: 'SHOT_NOT_FOUND',
+        message: 'Index out of bonds',
+        name: 'WebcamError'
+      })
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
+  })
+
   it('does not build base64 output when returning buffers', async () => {
     const directory = mkdtempSync(join(tmpdir(), 'node-webcam-'))
     const path = join(directory, 'photo.png')
