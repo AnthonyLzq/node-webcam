@@ -3,12 +3,14 @@ import { readFileSync } from 'fs'
 import { promisify } from 'util'
 
 import { WebcamError, getCommandErrorCode } from '../errors'
+import { logDiagnostic } from '../logger'
 import { Shot, getCameras, setDefaults } from '../utils'
 import type { WebcamConfig } from '../types'
 
 const asyncExecFile = promisify(execFile)
 const r = /(?<=\.)[^.]*$/
 const ALLOWED_FILE_TYPES = ['jpg', 'jpeg', 'png', 'bmp']
+let diagnosticCounter = 0
 
 export type WebcamCommand = {
   file: string
@@ -71,6 +73,30 @@ class BaseWebcam {
     return new Shot(location, data)
   }
 
+  protected createDiagnosticId(operation: string) {
+    diagnosticCounter += 1
+
+    return `${operation}-${diagnosticCounter}`
+  }
+
+  protected getBackendName() {
+    return this.constructor.name
+  }
+
+  protected getElapsedMs(startedAt: number) {
+    return Date.now() - startedAt
+  }
+
+  protected logDiagnostic(
+    event: string,
+    details: Record<string, unknown>,
+    level: 'debug' | 'error' | 'info' = 'debug'
+  ) {
+    if (!this.#options.verbose) return
+
+    logDiagnostic({ details, event, level })
+  }
+
   async capture(
     command: WebcamCommand,
     path: string,
@@ -126,12 +152,26 @@ class BaseWebcam {
         }
       })
 
+    const operationId = this.createDiagnosticId('capture')
+    const startedAt = Date.now()
+    const diagnosticBase = {
+      args: command.args,
+      backend: this.getBackendName(),
+      file: command.file,
+      operationId,
+      path,
+      returnType
+    }
+
+    this.logDiagnostic('capture:start', diagnosticBase)
+
     try {
       await asyncExecFile(command.file, command.args, {
         maxBuffer: 1024 * 10_000
       })
     } catch (error) {
       const code = getCommandErrorCode(error)
+      const elapsedMs = this.getElapsedMs(startedAt)
       const typedError = new WebcamError({
         code,
         message:
@@ -141,13 +181,23 @@ class BaseWebcam {
         cause: error,
         details: {
           args: command.args,
+          elapsedMs,
           file: command.file,
+          operationId,
           path,
           returnType
         }
       })
 
-      if (this.#options.verbose) console.error('Error while capturing: ', error)
+      this.logDiagnostic(
+        'capture:error',
+        {
+          ...diagnosticBase,
+          code,
+          elapsedMs
+        },
+        'error'
+      )
 
       throw typedError
     }
@@ -157,20 +207,41 @@ class BaseWebcam {
     try {
       buffer = readFileSync(path)
     } catch (error) {
+      const elapsedMs = this.getElapsedMs(startedAt)
       const typedError = new WebcamError({
         code: 'OUTPUT_READ_FAILED',
         message: `Unable to read captured output: ${path}`,
         cause: error,
         details: {
+          elapsedMs,
+          operationId,
           path,
           returnType
         }
       })
 
-      if (this.#options.verbose) console.error('Error while capturing: ', error)
+      this.logDiagnostic(
+        'capture:error',
+        {
+          ...diagnosticBase,
+          code: 'OUTPUT_READ_FAILED',
+          elapsedMs
+        },
+        'error'
+      )
 
       throw typedError
     }
+
+    this.logDiagnostic(
+      'capture:success',
+      {
+        ...diagnosticBase,
+        bytes: buffer.length,
+        elapsedMs: this.getElapsedMs(startedAt)
+      },
+      'info'
+    )
 
     if (returnType === 'buffer') return buffer
 

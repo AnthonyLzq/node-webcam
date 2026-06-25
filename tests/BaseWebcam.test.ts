@@ -5,8 +5,49 @@ import { join } from 'node:path'
 import { describe, it } from 'node:test'
 
 import { WebcamError } from '../src/errors'
+import { resetLogger, setLogger, WebcamLogEntry } from '../src/logger'
 import { BaseWebcam } from '../src/webcams/BaseWebcam'
 import { Shot } from '../src/utils'
+
+type ConsoleCall = {
+  args: unknown[]
+  level: 'debug' | 'error' | 'info' | 'warn'
+}
+
+const captureConsoleOutput = async (fn: () => Promise<void>) => {
+  const calls: ConsoleCall[] = []
+  const originalConsoleDebug = console.debug
+  const originalConsoleError = console.error
+  const originalConsoleInfo = console.info
+  const originalConsoleWarn = console.warn
+
+  console.debug = (...args: unknown[]) => {
+    calls.push({ args, level: 'debug' })
+  }
+  console.error = (...args: unknown[]) => {
+    calls.push({ args, level: 'error' })
+  }
+  console.info = (...args: unknown[]) => {
+    calls.push({ args, level: 'info' })
+  }
+  console.warn = (...args: unknown[]) => {
+    calls.push({ args, level: 'warn' })
+  }
+
+  try {
+    await fn()
+  } finally {
+    console.debug = originalConsoleDebug
+    console.error = originalConsoleError
+    console.info = originalConsoleInfo
+    console.warn = originalConsoleWarn
+  }
+
+  return calls
+}
+
+const writeFixtureImageScript =
+  'require("node:fs").writeFileSync(process.argv[1], Buffer.from([1, 2, 3]))'
 
 describe('BaseWebcam', () => {
   it('returns a defensive copy of options', () => {
@@ -156,11 +197,7 @@ describe('BaseWebcam', () => {
       const result = await webcam.capture(
         {
           file: process.execPath,
-          args: [
-            '-e',
-            'require("node:fs").writeFileSync(process.argv[1], Buffer.from([1, 2, 3]))',
-            path
-          ]
+          args: ['-e', writeFixtureImageScript, path]
         },
         path,
         'buffer'
@@ -170,6 +207,148 @@ describe('BaseWebcam', () => {
     } finally {
       rmSync(directory, { recursive: true, force: true })
     }
+  })
+
+  it('stays silent by default during successful captures', async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'node-webcam-'))
+    const path = join(directory, 'photo.png')
+    const webcam = new BaseWebcam({ output: 'png' })
+
+    try {
+      const calls = await captureConsoleOutput(async () => {
+        await webcam.capture(
+          {
+            file: process.execPath,
+            args: ['-e', writeFixtureImageScript, path]
+          },
+          path,
+          'buffer'
+        )
+      })
+
+      assert.equal(calls.length, 0)
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
+  })
+
+  it('emits verbose capture diagnostics for successful captures', async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'node-webcam-'))
+    const path = join(directory, 'photo.png')
+    const webcam = new BaseWebcam({ output: 'png', verbose: true })
+
+    try {
+      const calls = await captureConsoleOutput(async () => {
+        await webcam.capture(
+          {
+            file: process.execPath,
+            args: ['-e', writeFixtureImageScript, path]
+          },
+          path,
+          'buffer'
+        )
+      })
+
+      assert.equal(calls.length, 2)
+      assert.equal(calls[0].level, 'debug')
+      assert.equal(calls[1].level, 'info')
+      assert.deepEqual(calls[0].args.slice(0, 2), [
+        '[node-webcam]',
+        'capture:start'
+      ])
+      assert.deepEqual(calls[1].args.slice(0, 2), [
+        '[node-webcam]',
+        'capture:success'
+      ])
+
+      const startDetails = calls[0].args[2] as Record<string, unknown>
+      const successDetails = calls[1].args[2] as Record<string, unknown>
+
+      assert.equal(startDetails.backend, 'BaseWebcam')
+      assert.equal(startDetails.file, process.execPath)
+      assert.deepEqual(startDetails.args, ['-e', writeFixtureImageScript, path])
+      assert.equal(startDetails.path, path)
+      assert.equal(startDetails.returnType, 'buffer')
+      assert.match(String(startDetails.operationId), /^capture-\d+$/)
+      assert.equal(successDetails.operationId, startDetails.operationId)
+      assert.equal(successDetails.bytes, 3)
+      assert.equal(typeof successDetails.elapsedMs, 'number')
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
+  })
+
+  it('emits verbose capture diagnostics for command failures', async () => {
+    const webcam = new BaseWebcam({ output: 'png', verbose: true })
+
+    const calls = await captureConsoleOutput(async () => {
+      await assert.rejects(
+        () =>
+          webcam.capture(
+            { file: 'definitely-not-node-webcam-command', args: [] },
+            'photo.png',
+            'buffer'
+          ),
+        { code: 'BINARY_NOT_FOUND' }
+      )
+    })
+
+    assert.equal(calls.length, 2)
+    assert.equal(calls[0].level, 'debug')
+    assert.equal(calls[1].level, 'error')
+    assert.deepEqual(calls[0].args.slice(0, 2), [
+      '[node-webcam]',
+      'capture:start'
+    ])
+    assert.deepEqual(calls[1].args.slice(0, 2), [
+      '[node-webcam]',
+      'capture:error'
+    ])
+
+    const startDetails = calls[0].args[2] as Record<string, unknown>
+    const errorDetails = calls[1].args[2] as Record<string, unknown>
+
+    assert.equal(errorDetails.operationId, startDetails.operationId)
+    assert.equal(errorDetails.code, 'BINARY_NOT_FOUND')
+    assert.equal(errorDetails.file, 'definitely-not-node-webcam-command')
+    assert.deepEqual(errorDetails.args, [])
+    assert.equal(typeof errorDetails.elapsedMs, 'number')
+  })
+
+  it('routes verbose diagnostics through the logger abstraction', async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'node-webcam-'))
+    const path = join(directory, 'photo.png')
+    const webcam = new BaseWebcam({ output: 'png', verbose: true })
+    const entries: WebcamLogEntry[] = []
+
+    setLogger({
+      log: entry => {
+        entries.push(entry)
+      }
+    })
+
+    try {
+      await webcam.capture(
+        {
+          file: process.execPath,
+          args: ['-e', writeFixtureImageScript, path]
+        },
+        path,
+        'buffer'
+      )
+    } finally {
+      resetLogger()
+      rmSync(directory, { recursive: true, force: true })
+    }
+
+    assert.deepEqual(
+      entries.map(entry => [entry.level, entry.event]),
+      [
+        ['debug', 'capture:start'],
+        ['info', 'capture:success']
+      ]
+    )
+    assert.equal(entries[0].details.backend, 'BaseWebcam')
   })
 
   it('throws a typed error for missing shot indexes', () => {

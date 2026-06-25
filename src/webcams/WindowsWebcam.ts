@@ -51,12 +51,34 @@ class WindowsWebcam extends BaseWebcam {
   }
 
   async listWebcams(): Promise<string[]> {
+    const command = { file: this.#bin, args: ['/devlist'] }
+    const operationId = this.createDiagnosticId('list')
+    const startedAt = Date.now()
     let result
 
+    this.logDiagnostic('list:start', {
+      ...command,
+      backend: this.getBackendName(),
+      operationId
+    })
+
     try {
-      result = await asyncExecFile(this.#bin, ['/devlist'])
+      result = await asyncExecFile(command.file, command.args)
     } catch (error) {
       const code = getCommandErrorCode(error)
+      const elapsedMs = this.getElapsedMs(startedAt)
+
+      this.logDiagnostic(
+        'list:error',
+        {
+          ...command,
+          backend: this.getBackendName(),
+          code,
+          elapsedMs,
+          operationId
+        },
+        'error'
+      )
 
       throw new WebcamError({
         code: code === 'BINARY_NOT_FOUND' ? code : 'CAMERA_LIST_FAILED',
@@ -66,29 +88,42 @@ class WindowsWebcam extends BaseWebcam {
             : 'Unable to list webcams',
         cause: error,
         details: {
-          args: ['/devlist'],
-          file: this.#bin
+          ...command,
+          elapsedMs,
+          operationId
         }
       })
     }
 
     if (result.stderr) {
-      if (this.options.verbose)
-        console.error('Error while listing webcams: ', result.stderr)
+      const elapsedMs = this.getElapsedMs(startedAt)
+
+      this.logDiagnostic(
+        'list:error',
+        {
+          ...command,
+          backend: this.getBackendName(),
+          code: 'CAMERA_LIST_FAILED',
+          elapsedMs,
+          operationId
+        },
+        'error'
+      )
 
       throw new WebcamError({
         code: 'CAMERA_LIST_FAILED',
         message: result.stderr,
         details: {
-          args: ['/devlist'],
-          file: this.#bin
+          ...command,
+          elapsedMs,
+          operationId
         }
       })
     }
 
     const lines = result.stdout.split('\n')
 
-    return lines.reduce<string[]>((acc, line) => {
+    const webcams = lines.reduce<string[]>((acc, line) => {
       const formattedLine = line.replace('\r', '')
 
       if (
@@ -103,6 +138,20 @@ class WindowsWebcam extends BaseWebcam {
 
       return acc
     }, [])
+
+    this.logDiagnostic(
+      'list:success',
+      {
+        ...command,
+        backend: this.getBackendName(),
+        cameraCount: webcams.length,
+        elapsedMs: this.getElapsedMs(startedAt),
+        operationId
+      },
+      'info'
+    )
+
+    return webcams
   }
 }
 
