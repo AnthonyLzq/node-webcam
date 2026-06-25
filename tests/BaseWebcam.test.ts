@@ -1,4 +1,7 @@
 import assert from 'node:assert/strict'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { describe, it } from 'node:test'
 
 import { BaseWebcam } from '../src/webcams/BaseWebcam'
@@ -18,7 +21,8 @@ describe('BaseWebcam', () => {
     const webcam = new BaseWebcam({})
 
     await assert.rejects(
-      () => webcam.capture('should-not-run', 'photo', 'buffer'),
+      () =>
+        webcam.capture({ file: 'should-not-run', args: [] }, 'photo', 'buffer'),
       /Invalid path, missing type file/
     )
   })
@@ -27,7 +31,12 @@ describe('BaseWebcam', () => {
     const webcam = new BaseWebcam({})
 
     await assert.rejects(
-      () => webcam.capture('should-not-run', 'photo.gif', 'buffer'),
+      () =>
+        webcam.capture(
+          { file: 'should-not-run', args: [] },
+          'photo.gif',
+          'buffer'
+        ),
       /Invalid file extension: gif/
     )
   })
@@ -36,9 +45,39 @@ describe('BaseWebcam', () => {
     const webcam = new BaseWebcam({ output: 'jpeg' })
 
     await assert.rejects(
-      () => webcam.capture('should-not-run', 'photo.png', 'buffer'),
+      () =>
+        webcam.capture(
+          { file: 'should-not-run', args: [] },
+          'photo.png',
+          'buffer'
+        ),
       /The output \(jpeg\) and the file type \(png\) does not match/
     )
+  })
+
+  it('executes capture commands without a shell', async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'node-webcam-'))
+    const path = join(directory, 'photo.png')
+    const webcam = new BaseWebcam({ output: 'png' })
+
+    try {
+      const result = await webcam.capture(
+        {
+          file: process.execPath,
+          args: [
+            '-e',
+            'require("node:fs").writeFileSync(process.argv[1], Buffer.from([1, 2, 3]))',
+            path
+          ]
+        },
+        path,
+        'buffer'
+      )
+
+      assert.deepEqual([...(result as Buffer)], [1, 2, 3])
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
   })
 })
 

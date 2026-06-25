@@ -1,13 +1,18 @@
-import { exec } from 'child_process'
+import { execFile } from 'child_process'
 import { promisify } from 'util'
 import { readFileSync } from 'fs'
 
 import { Shot, getCameras, setDefaults } from '../utils'
 import type { WebcamConfig } from '../types'
 
-const asyncExec = promisify(exec)
+const asyncExecFile = promisify(execFile)
 const r = /(?<=\.)[^.]*$/
 const ALLOWED_FILE_TYPES = ['jpg', 'jpeg', 'png', 'bmp']
+
+export type WebcamCommand = {
+  file: string
+  args: string[]
+}
 
 class BaseWebcam {
   #shots: Shot[]
@@ -63,7 +68,11 @@ class BaseWebcam {
     return new Shot(location, data)
   }
 
-  async capture(sh: string, path: string, returnType: 'buffer' | 'base64') {
+  async capture(
+    command: WebcamCommand,
+    path: string,
+    returnType: 'buffer' | 'base64'
+  ) {
     const match = path.match(r)
 
     if (!match) throw new Error('Invalid path, missing type file')
@@ -81,7 +90,9 @@ class BaseWebcam {
       )
 
     try {
-      await asyncExec(sh, { maxBuffer: 1024 * 10_000 })
+      await asyncExecFile(command.file, command.args, {
+        maxBuffer: 1024 * 10_000
+      })
 
       const buffer = readFileSync(path)
 

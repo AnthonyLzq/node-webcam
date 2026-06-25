@@ -1,5 +1,5 @@
 import type { WebcamConfig } from '../types'
-import { BaseWebcam } from './BaseWebcam'
+import { BaseWebcam, WebcamCommand } from './BaseWebcam'
 
 class FSWebcam extends BaseWebcam {
   #bin: string
@@ -11,6 +11,9 @@ class FSWebcam extends BaseWebcam {
     if (options?.quality && options.quality > 9) this.setMaxQuality()
   }
 
+  /**
+   * @deprecated Use `generateCommand()` for safe argument-based execution.
+   */
   generateSh(location: string): string {
     const options = super.options
     const resolution = ` -r ${options.width}x${options.height}`
@@ -41,6 +44,38 @@ class FSWebcam extends BaseWebcam {
       / +/g,
       ' '
     )
+  }
+
+  generateCommand(location: string): WebcamCommand {
+    const options = super.options
+    const args = [
+      ...(options.verbose ? [] : ['-q']),
+      '-r',
+      `${options.width}x${options.height}`,
+      '-F',
+      String(options.frames),
+      '-D',
+      String(options.delay)
+    ]
+
+    if (options.title) args.push('--title', options.title)
+    if (options.subtitle) args.push('--subtitle', options.subtitle)
+    if (options.timestamp) args.push('--timestamp', options.timestamp)
+    if (options.device) args.push('-d', options.device)
+    if (options.greyScale) args.push('--greyscale')
+    if (options.rotation) args.push('--rotate', String(options.rotation))
+
+    if (!options.topBanner && !options.bottomBanner) args.push('--no-banner')
+    else if (options.topBanner) args.push('--top-banner')
+    else args.push('--bottom-banner')
+
+    if (options.skip) args.push('--skip', String(options.skip))
+    if (options.output !== 'jpg') args.push(`--${options.output}`, '-1')
+
+    if (location) args.push(location)
+    else args.push('-', '-')
+
+    return { file: this.#bin, args }
   }
 
   getListControlsSh() {

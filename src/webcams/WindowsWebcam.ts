@@ -1,11 +1,11 @@
-import { exec } from 'child_process'
+import { execFile } from 'child_process'
 import { promisify } from 'util'
 import { resolve } from 'path'
 
 import type { WebcamConfig } from '../types'
-import { BaseWebcam } from './BaseWebcam'
+import { BaseWebcam, WebcamCommand } from './BaseWebcam'
 
-const asyncExec = promisify(exec)
+const asyncExecFile = promisify(execFile)
 
 class WindowsWebcam extends BaseWebcam {
   #bin: string
@@ -23,6 +23,9 @@ class WindowsWebcam extends BaseWebcam {
     if (options?.delay) super.setDelayInMilliseconds()
   }
 
+  /**
+   * @deprecated Use `generateCommand()` for safe argument-based execution.
+   */
   generateSh(location: string): string {
     const { options } = this
     const device = options.device ? `/devnum ${options.device}` : ''
@@ -34,9 +37,20 @@ class WindowsWebcam extends BaseWebcam {
     )
   }
 
+  generateCommand(location: string): WebcamCommand {
+    const { options } = this
+    const args = []
+
+    if (options.delay) args.push('/delay', String(options.delay))
+    if (options.device) args.push('/devnum', options.device)
+
+    args.push('/filename', location)
+
+    return { file: this.#bin, args }
+  }
+
   async listWebcams(): Promise<string[]> {
-    const sh = `${this.#bin} /devlist`
-    const result = await asyncExec(sh)
+    const result = await asyncExecFile(this.#bin, ['/devlist'])
 
     if (result.stderr) {
       if (this.options.verbose)

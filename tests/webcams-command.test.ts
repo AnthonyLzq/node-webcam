@@ -6,16 +6,33 @@ import { FSWebcam, ImageSnapWebcam, WindowsWebcam } from '../src/webcams'
 
 describe('backend command generation', () => {
   it('preserves the default fswebcam command', () => {
-    const command = new FSWebcam({}).generateSh('photo.jpeg')
+    const webcam = new FSWebcam({})
+    const command = webcam.generateSh('photo.jpeg')
 
     assert.equal(
       command,
       'fswebcam -q -r 1280x720 -F 1 -D 0 --no-banner --jpeg -1 photo.jpeg'
     )
+    assert.deepEqual(webcam.generateCommand('photo.jpeg'), {
+      file: 'fswebcam',
+      args: [
+        '-q',
+        '-r',
+        '1280x720',
+        '-F',
+        '1',
+        '-D',
+        '0',
+        '--no-banner',
+        '--jpeg',
+        '-1',
+        'photo.jpeg'
+      ]
+    })
   })
 
   it('preserves fswebcam command options that affect shell arguments', () => {
-    const command = new FSWebcam({
+    const webcam = new FSWebcam({
       title: 'Front Camera',
       subtitle: 'Desk',
       timestamp: '%Y-%m-%d',
@@ -24,7 +41,8 @@ describe('backend command generation', () => {
       rotation: 180,
       skip: 3,
       output: 'png'
-    }).generateSh('photo.png')
+    })
+    const command = webcam.generateSh('photo.png')
 
     assert.equal(
       command,
@@ -32,24 +50,63 @@ describe('backend command generation', () => {
         '--subtitle Desk --timestamp %Y-%m-%d -d /dev/video2 --greyscale ' +
         '--rotate 180 --no-banner --skip 3 --png -1 photo.png'
     )
+    assert.deepEqual(webcam.generateCommand('photo.png'), {
+      file: 'fswebcam',
+      args: [
+        '-q',
+        '-r',
+        '1280x720',
+        '-F',
+        '1',
+        '-D',
+        '0',
+        '--title',
+        'Front Camera',
+        '--subtitle',
+        'Desk',
+        '--timestamp',
+        '%Y-%m-%d',
+        '-d',
+        '/dev/video2',
+        '--greyscale',
+        '--rotate',
+        '180',
+        '--no-banner',
+        '--skip',
+        '3',
+        '--png',
+        '-1',
+        'photo.png'
+      ]
+    })
   })
 
   it('preserves the default imagesnap command', () => {
-    const command = new ImageSnapWebcam({}).generateSh('photo.jpeg')
+    const webcam = new ImageSnapWebcam({})
+    const command = webcam.generateSh('photo.jpeg')
 
     assert.equal(command, 'imagesnap -q photo.jpeg')
+    assert.deepEqual(webcam.generateCommand('photo.jpeg'), {
+      file: 'imagesnap',
+      args: ['-q', 'photo.jpeg']
+    })
   })
 
   it('preserves imagesnap delay and device arguments', () => {
-    const command = new ImageSnapWebcam({
+    const webcam = new ImageSnapWebcam({
       delay: 2,
       device: 'FaceTime HD Camera'
-    }).generateSh('photo.jpeg')
+    })
+    const command = webcam.generateSh('photo.jpeg')
 
     assert.equal(
       command,
       'imagesnap -w 2 -d "FaceTime HD Camera" -q photo.jpeg'
     )
+    assert.deepEqual(webcam.generateCommand('photo.jpeg'), {
+      file: 'imagesnap',
+      args: ['-w', '2', '-d', 'FaceTime HD Camera', '-q', 'photo.jpeg']
+    })
   })
 
   it('preserves the default Windows CommandCam command', () => {
@@ -61,9 +118,14 @@ describe('backend command generation', () => {
       'CommandCam.exe'
     )
 
-    const command = new WindowsWebcam({}).generateSh('photo.bmp')
+    const webcam = new WindowsWebcam({})
+    const command = webcam.generateSh('photo.bmp')
 
     assert.equal(command, `${bin} /filename photo.bmp`)
+    assert.deepEqual(webcam.generateCommand('photo.bmp'), {
+      file: bin,
+      args: ['/filename', 'photo.bmp']
+    })
   })
 
   it('preserves Windows delay and device arguments', () => {
@@ -75,11 +137,41 @@ describe('backend command generation', () => {
       'CommandCam.exe'
     )
 
-    const command = new WindowsWebcam({
+    const webcam = new WindowsWebcam({
       delay: 2,
       device: '1'
-    }).generateSh('photo.bmp')
+    })
+    const command = webcam.generateSh('photo.bmp')
 
     assert.equal(command, `${bin} /delay 2000 /devnum 1 /filename photo.bmp`)
+    assert.deepEqual(webcam.generateCommand('photo.bmp'), {
+      file: bin,
+      args: ['/delay', '2000', '/devnum', '1', '/filename', 'photo.bmp']
+    })
+  })
+
+  it('keeps shell metacharacters inside fswebcam argument values', () => {
+    const webcam = new FSWebcam({
+      title: 'hello; rm -rf /',
+      device: '/dev/video 2'
+    })
+
+    assert.deepEqual(webcam.generateCommand('photo name.jpeg').args, [
+      '-q',
+      '-r',
+      '1280x720',
+      '-F',
+      '1',
+      '-D',
+      '0',
+      '--title',
+      'hello; rm -rf /',
+      '-d',
+      '/dev/video 2',
+      '--no-banner',
+      '--jpeg',
+      '-1',
+      'photo name.jpeg'
+    ])
   })
 })

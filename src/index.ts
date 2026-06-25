@@ -32,7 +32,7 @@ const capture = async (
   const Webcam = create(options, type)
   const path = resolve(__dirname, location)
   const result = await Webcam.capture(
-    Webcam.generateSh(location),
+    Webcam.generateCommand(location),
     path,
     returnType
   )
