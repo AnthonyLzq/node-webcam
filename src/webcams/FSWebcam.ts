@@ -1,4 +1,4 @@
-import type { WebcamConfig } from 'types'
+import type { WebcamConfig } from '../types'
 import { BaseWebcam } from './BaseWebcam'
 
 class FSWebcam extends BaseWebcam {

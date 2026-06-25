@@ -1,4 +1,4 @@
-import type { WebcamConfig } from 'types'
+import type { WebcamConfig } from '../types'
 
 const defaults: WebcamConfig = {
   width: 1280,

@@ -1,13 +1,28 @@
 {
-  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "target": "ES2015",
+    "module": "Node16",
+    "allowJs": true,
+    "declaration": true,
+    "outDir": "dist",
+    "rootDir": ".",
+    "removeComments": true,
+    "strict": true,
+    "noImplicitAny": true,
+    "moduleResolution": "node16",
+    "types": ["node"],
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "sourceMap": false,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": [
+    "src",
+    "tests/**/*.ts"
+  ],
   "exclude": [
     "node_modules",
-    "test",
-    "tests",
-    "__test__",
     "dist"
-  ],
-  "include": [
-    "src"
   ]
 }
