@@ -1,5 +1,6 @@
 import { platform } from 'os'
 
+import { WebcamError } from './errors'
 import { FSWebcam, ImageSnapWebcam, WindowsWebcam } from './webcams'
 import type { WebcamConfig } from './types'
 
@@ -28,7 +29,14 @@ class Factory {
 
   create(type: string) {
     if (!Object.keys(this.#types).includes(type))
-      throw new Error('Webcam type is not supported')
+      throw new WebcamError({
+        code: 'UNSUPPORTED_WEBCAM_TYPE',
+        message: 'Webcam type is not supported',
+        details: {
+          requestedType: type,
+          supportedTypes: Object.keys(this.#types)
+        }
+      })
 
     const p = (type || this.#platform) as keyof WebcamTypes
 

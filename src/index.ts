@@ -55,5 +55,7 @@ export {
   WindowsWebcam
 }
 export { defaults } from './utils'
+export { WebcamError } from './errors'
 
 export type NodeWebcamConfig = WebcamConfig
+export type { WebcamErrorCode } from './errors'

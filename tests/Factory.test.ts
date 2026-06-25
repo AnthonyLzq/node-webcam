@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
+import { WebcamError } from '../src/errors'
 import { Factory } from '../src/Factory'
 import { FSWebcam, ImageSnapWebcam, WindowsWebcam } from '../src/webcams'
 
@@ -31,9 +32,18 @@ describe('Factory', () => {
   })
 
   it('rejects unsupported backend types', () => {
-    assert.throws(
-      () => new Factory({}).create('unsupported'),
-      /Webcam type is not supported/
-    )
+    assert.throws(() => new Factory({}).create('unsupported'), {
+      code: 'UNSUPPORTED_WEBCAM_TYPE',
+      message: 'Webcam type is not supported',
+      name: 'WebcamError'
+    })
+
+    try {
+      new Factory({}).create('unsupported')
+      assert.fail('Expected Factory.create to throw')
+    } catch (error) {
+      assert.ok(error instanceof WebcamError)
+      assert.deepEqual(error.details?.requestedType, 'unsupported')
+    }
   })
 })

@@ -1,7 +1,8 @@
 import { execFile } from 'child_process'
-import { promisify } from 'util'
 import { readFileSync } from 'fs'
+import { promisify } from 'util'
 
+import { WebcamError, getCommandErrorCode } from '../errors'
 import { Shot, getCameras, setDefaults } from '../utils'
 import type { WebcamConfig } from '../types'
 
@@ -13,6 +14,8 @@ export type WebcamCommand = {
   file: string
   args: string[]
 }
+
+type CaptureReturnType = 'buffer' | 'base64'
 
 class BaseWebcam {
   #shots: Shot[]
@@ -71,49 +74,116 @@ class BaseWebcam {
   async capture(
     command: WebcamCommand,
     path: string,
-    returnType: 'buffer' | 'base64'
+    returnType: CaptureReturnType
   ) {
     const match = path.match(r)
 
-    if (!match) throw new Error('Invalid path, missing type file')
+    if (!match)
+      throw new WebcamError({
+        code: 'INVALID_OUTPUT_PATH',
+        message: 'Invalid path, missing type file',
+        details: { path }
+      })
 
-    if (!match[0]) throw new Error(`Invalid type extension: ${match[0]}`)
+    if (!match[0])
+      throw new WebcamError({
+        code: 'INVALID_FILE_EXTENSION',
+        message: `Invalid type extension: ${match[0]}`,
+        details: { extension: match[0], path }
+      })
 
     if (!ALLOWED_FILE_TYPES.includes(match[0]))
-      throw new Error(`Invalid file extension: ${match[0]}`)
+      throw new WebcamError({
+        code: 'INVALID_FILE_EXTENSION',
+        message: `Invalid file extension: ${match[0]}`,
+        details: {
+          allowedFileTypes: ALLOWED_FILE_TYPES,
+          extension: match[0],
+          path
+        }
+      })
 
     if (this.#options.output !== match[0])
-      throw new Error(
-        `The output (${this.#options.output}) and the file type (${
+      throw new WebcamError({
+        code: 'OUTPUT_MISMATCH',
+        message: `The output (${this.#options.output}) and the file type (${
           match[0]
-        }) does not match`
-      )
+        }) does not match`,
+        details: {
+          extension: match[0],
+          output: this.#options.output,
+          path
+        }
+      })
+
+    if (!['buffer', 'base64'].includes(returnType))
+      throw new WebcamError({
+        code: 'INVALID_RETURN_TYPE',
+        message: `Invalid returnType: ${returnType}`,
+        details: {
+          allowedReturnTypes: ['buffer', 'base64'],
+          returnType
+        }
+      })
 
     try {
       await asyncExecFile(command.file, command.args, {
         maxBuffer: 1024 * 10_000
       })
-
-      const buffer = readFileSync(path)
-
-      switch (returnType) {
-        case 'buffer':
-          return buffer
-        case 'base64':
-          return this.getBase64FromBuffer(buffer)
-        default:
-          throw new Error(`Invalid returnType: ${returnType}`)
-      }
     } catch (error) {
-      if (this.#options.verbose) console.error('Error while shotting: ', error)
+      const code = getCommandErrorCode(error)
+      const typedError = new WebcamError({
+        code,
+        message:
+          code === 'BINARY_NOT_FOUND'
+            ? `Webcam command binary was not found: ${command.file}`
+            : `Webcam command failed: ${command.file}`,
+        cause: error,
+        details: {
+          args: command.args,
+          file: command.file,
+          path,
+          returnType
+        }
+      })
 
-      throw error
+      if (this.#options.verbose) console.error('Error while capturing: ', error)
+
+      throw typedError
     }
+
+    let buffer: Buffer
+
+    try {
+      buffer = readFileSync(path)
+    } catch (error) {
+      const typedError = new WebcamError({
+        code: 'OUTPUT_READ_FAILED',
+        message: `Unable to read captured output: ${path}`,
+        cause: error,
+        details: {
+          path,
+          returnType
+        }
+      })
+
+      if (this.#options.verbose) console.error('Error while capturing: ', error)
+
+      throw typedError
+    }
+
+    if (returnType === 'buffer') return buffer
+
+    return this.getBase64FromBuffer(buffer)
   }
 
   getShot(index: number): Shot {
-    if (index < 0 || index > this.#shots.length)
-      throw new Error('Index out of bonds')
+    if (index < 0 || index >= this.#shots.length)
+      throw new WebcamError({
+        code: 'SHOT_NOT_FOUND',
+        message: 'Index out of bonds',
+        details: { index, shots: this.#shots.length }
+      })
 
     return this.#shots[index]
   }

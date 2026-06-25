@@ -2,6 +2,7 @@ import { execFile } from 'child_process'
 import { promisify } from 'util'
 import { resolve } from 'path'
 
+import { WebcamError, getCommandErrorCode } from '../errors'
 import type { WebcamConfig } from '../types'
 import { BaseWebcam, WebcamCommand } from './BaseWebcam'
 
@@ -50,13 +51,39 @@ class WindowsWebcam extends BaseWebcam {
   }
 
   async listWebcams(): Promise<string[]> {
-    const result = await asyncExecFile(this.#bin, ['/devlist'])
+    let result
+
+    try {
+      result = await asyncExecFile(this.#bin, ['/devlist'])
+    } catch (error) {
+      const code = getCommandErrorCode(error)
+
+      throw new WebcamError({
+        code: code === 'BINARY_NOT_FOUND' ? code : 'CAMERA_LIST_FAILED',
+        message:
+          code === 'BINARY_NOT_FOUND'
+            ? `Webcam command binary was not found: ${this.#bin}`
+            : 'Unable to list webcams',
+        cause: error,
+        details: {
+          args: ['/devlist'],
+          file: this.#bin
+        }
+      })
+    }
 
     if (result.stderr) {
       if (this.options.verbose)
         console.error('Error while listing webcams: ', result.stderr)
 
-      throw new Error(result.stderr)
+      throw new WebcamError({
+        code: 'CAMERA_LIST_FAILED',
+        message: result.stderr,
+        details: {
+          args: ['/devlist'],
+          file: this.#bin
+        }
+      })
     }
 
     const lines = result.stdout.split('\n')
