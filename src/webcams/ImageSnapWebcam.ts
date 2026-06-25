@@ -1,11 +1,6 @@
-import { execFile } from 'child_process'
-import { promisify } from 'util'
-
-import { WebcamError, getCommandErrorCode } from '../errors'
 import type { WebcamConfig } from '../types'
+import { getPlatformCameras } from '../utils'
 import { BaseWebcam, WebcamCommand } from './BaseWebcam'
-
-const asyncExecFile = promisify(execFile)
 
 class ImageSnapWebcam extends BaseWebcam {
   #bin: string
@@ -45,102 +40,7 @@ class ImageSnapWebcam extends BaseWebcam {
   }
 
   async listWebcams(): Promise<string[]> {
-    const command = { file: this.#bin, args: ['-l'] }
-    const operationId = this.createDiagnosticId('list')
-    const startedAt = Date.now()
-    let result: {
-      stdout: string
-      stderr: string
-    }
-
-    this.logDiagnostic('list:start', {
-      ...command,
-      backend: this.getBackendName(),
-      operationId
-    })
-
-    try {
-      result = await asyncExecFile(command.file, command.args)
-    } catch (error) {
-      const code = getCommandErrorCode(error)
-      const elapsedMs = this.getElapsedMs(startedAt)
-
-      this.logDiagnostic(
-        'list:error',
-        {
-          ...command,
-          backend: this.getBackendName(),
-          code,
-          elapsedMs,
-          operationId
-        },
-        'error'
-      )
-
-      throw new WebcamError({
-        code: code === 'BINARY_NOT_FOUND' ? code : 'CAMERA_LIST_FAILED',
-        message:
-          code === 'BINARY_NOT_FOUND'
-            ? `Webcam command binary was not found: ${this.#bin}`
-            : 'Unable to list webcams',
-        cause: error,
-        details: {
-          ...command,
-          elapsedMs,
-          operationId
-        }
-      })
-    }
-
-    if (result.stderr) {
-      const elapsedMs = this.getElapsedMs(startedAt)
-
-      this.logDiagnostic(
-        'list:error',
-        {
-          ...command,
-          backend: this.getBackendName(),
-          code: 'CAMERA_LIST_FAILED',
-          elapsedMs,
-          operationId
-        },
-        'error'
-      )
-
-      throw new WebcamError({
-        code: 'CAMERA_LIST_FAILED',
-        message: result.stderr,
-        details: {
-          ...command,
-          elapsedMs,
-          operationId
-        }
-      })
-    }
-
-    const lines = result.stdout.split('\n')
-
-    const webcams = lines.reduce<string[]>((acc, line) => {
-      if (line === 'Video Devices:' || !line) return acc
-
-      acc.push(line.replace(/.*?\[(.*?)\].*/, '$1'))
-
-      return acc
-    }, [])
-
-    this.logDiagnostic(
-      'list:success',
-      {
-        ...command,
-        backend: this.getBackendName(),
-        cameraCount: webcams.length,
-        elapsedMs: this.getElapsedMs(startedAt),
-        operationId
-      },
-      'info'
-    )
-
-    return webcams
+    return getPlatformCameras({ platform: 'darwin' })
   }
 }
 

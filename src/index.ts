@@ -42,7 +42,7 @@ const capture = async (
   return result
 }
 
-const list = (type: string) => create({}, type).list()
+const list = async (type: string) => create({}, type).listWebcams()
 
 export {
   create,

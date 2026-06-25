@@ -4,7 +4,12 @@ import { promisify } from 'util'
 
 import { WebcamError, getCommandErrorCode } from '../errors'
 import { logDiagnostic } from '../logger'
-import { Shot, getCameras, setDefaults } from '../utils'
+import {
+  Shot,
+  getLinuxCameras,
+  getPlatformCameras,
+  setDefaults
+} from '../utils'
 import type { WebcamConfig } from '../types'
 
 const asyncExecFile = promisify(execFile)
@@ -52,12 +57,19 @@ class BaseWebcam {
     this.#shots = []
   }
 
-  list(): string[] | void {
-    return getCameras()
+  /**
+   * @deprecated Use `listWebcams()` for platform-aware async camera listing.
+   */
+  list(): string[] {
+    return getLinuxCameras()
+  }
+
+  async listWebcams(): Promise<string[]> {
+    return getPlatformCameras()
   }
 
   hasCamera(camera: string) {
-    return this.list()?.includes(camera) ?? false
+    return this.list().includes(camera)
   }
 
   getListControlsSh(bin: string) {
