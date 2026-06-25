@@ -19,6 +19,7 @@ import type { WebcamConfig } from '../types'
 const asyncExecFile = promisify(execFile)
 const r = /(?<=\.)[^.]*$/
 const ALLOWED_FILE_TYPES = ['jpg', 'jpeg', 'png', 'bmp']
+const captureQueues = new Map<string, Promise<void>>()
 let diagnosticCounter = 0
 
 export type WebcamCommand = {
@@ -27,6 +28,32 @@ export type WebcamCommand = {
 }
 
 type CaptureReturnType = 'buffer' | 'base64'
+
+const runQueued = async <T>(key: string, task: () => Promise<T>) => {
+  const previous = captureQueues.get(key) ?? Promise.resolve()
+
+  let release!: () => void
+  const current = previous
+    .catch(() => undefined)
+    .then(
+      () =>
+        new Promise<void>(resolve => {
+          release = resolve
+        })
+    )
+
+  captureQueues.set(key, current)
+
+  await previous.catch(() => undefined)
+
+  try {
+    return await task()
+  } finally {
+    release()
+
+    if (captureQueues.get(key) === current) captureQueues.delete(key)
+  }
+}
 
 class BaseWebcam {
   #shots: Shot[]
@@ -113,6 +140,14 @@ class BaseWebcam {
     logDiagnostic({ details, event, level })
   }
 
+  protected async executeCommand(command: WebcamCommand) {
+    await asyncExecFile(command.file, command.args, {
+      maxBuffer: 1024 * 10_000,
+      signal: this.#options.signal,
+      timeout: this.#options.timeout
+    })
+  }
+
   async capture(
     command: WebcamCommand,
     path: string,
@@ -177,6 +212,16 @@ class BaseWebcam {
         }
       })
 
+    return runQueued(path, async () =>
+      this.runCapture(command, path, returnType)
+    )
+  }
+
+  private async runCapture(
+    command: WebcamCommand,
+    path: string,
+    returnType: CaptureReturnType
+  ) {
     const operationId = this.createDiagnosticId('capture')
     const startedAt = Date.now()
     const diagnosticBase = {
@@ -192,11 +237,7 @@ class BaseWebcam {
     this.logDiagnostic('capture:start', diagnosticBase)
 
     try {
-      await asyncExecFile(command.file, command.args, {
-        maxBuffer: 1024 * 10_000,
-        signal: this.#options.signal,
-        timeout: this.#options.timeout
-      })
+      await this.executeCommand(command)
     } catch (error) {
       const code = getCommandErrorCode(error, {
         timeout: this.#options.timeout

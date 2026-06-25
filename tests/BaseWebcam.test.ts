@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { mkdtempSync, rmSync } from 'node:fs'
+import { writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, it } from 'node:test'
@@ -57,6 +58,34 @@ class Base64CountingWebcam extends BaseWebcam {
     this.base64Calls += 1
 
     return super.getBase64FromBuffer(shotBuffer)
+  }
+}
+
+class FakeCaptureWebcam extends BaseWebcam {
+  activeCaptures = 0
+  calls = 0
+  failFirstCapture = false
+  maxActiveCaptures = 0
+
+  protected async executeCommand(_command: { file: string; args: string[] }) {
+    this.calls += 1
+    const call = this.calls
+    this.activeCaptures += 1
+    this.maxActiveCaptures = Math.max(
+      this.maxActiveCaptures,
+      this.activeCaptures
+    )
+
+    try {
+      await new Promise(resolve => setTimeout(resolve, 20))
+
+      if (this.failFirstCapture && call === 1)
+        throw new Error('fake capture failed')
+
+      await writeFile(_command.args[0], Buffer.from([call]))
+    } finally {
+      this.activeCaptures -= 1
+    }
   }
 }
 
@@ -341,6 +370,87 @@ describe('BaseWebcam', () => {
         message: 'Index out of bonds',
         name: 'WebcamError'
       })
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
+  })
+
+  it('serializes concurrent captures that share an output path', async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'node-webcam-'))
+    const path = join(directory, 'photo.png')
+    const webcam = new FakeCaptureWebcam({
+      output: 'png',
+      saveShots: false
+    })
+
+    try {
+      await Promise.all([
+        webcam.capture({ file: 'fake', args: [path] }, path, 'buffer'),
+        webcam.capture({ file: 'fake', args: [path] }, path, 'buffer')
+      ])
+
+      assert.equal(webcam.maxActiveCaptures, 1)
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
+  })
+
+  it('allows concurrent captures with different output paths', async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'node-webcam-'))
+    const firstPath = join(directory, 'first.png')
+    const secondPath = join(directory, 'second.png')
+    const webcam = new FakeCaptureWebcam({
+      output: 'png',
+      saveShots: false
+    })
+
+    try {
+      await Promise.all([
+        webcam.capture(
+          { file: 'fake', args: [firstPath] },
+          firstPath,
+          'buffer'
+        ),
+        webcam.capture(
+          { file: 'fake', args: [secondPath] },
+          secondPath,
+          'buffer'
+        )
+      ])
+
+      assert.equal(webcam.maxActiveCaptures, 2)
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
+  })
+
+  it('releases output path queues after capture failures', async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'node-webcam-'))
+    const path = join(directory, 'photo.png')
+    const webcam = new FakeCaptureWebcam({
+      output: 'png',
+      saveShots: false
+    })
+    webcam.failFirstCapture = true
+
+    try {
+      const first = webcam.capture(
+        { file: 'fake', args: [path] },
+        path,
+        'buffer'
+      )
+      const second = webcam.capture(
+        { file: 'fake', args: [path] },
+        path,
+        'buffer'
+      )
+
+      await assert.rejects(() => first, {
+        code: 'COMMAND_FAILED',
+        name: 'WebcamError'
+      })
+      assert.deepEqual([...((await second) as Buffer)], [2])
+      assert.equal(webcam.maxActiveCaptures, 1)
     } finally {
       rmSync(directory, { recursive: true, force: true })
     }
