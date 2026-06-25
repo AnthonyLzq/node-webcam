@@ -1,5 +1,6 @@
 import { execFile } from 'child_process'
 import { readFileSync } from 'fs'
+import { readFile } from 'fs/promises'
 import { promisify } from 'util'
 
 import {
@@ -238,7 +239,7 @@ class BaseWebcam {
     let buffer: Buffer
 
     try {
-      buffer = readFileSync(path)
+      buffer = await readFile(path)
     } catch (error) {
       const elapsedMs = this.getElapsedMs(startedAt)
       const typedError = new WebcamError({

@@ -50,6 +50,16 @@ const writeFixtureImageScript =
   'require("node:fs").writeFileSync(process.argv[1], Buffer.from([1, 2, 3]))'
 const waitForeverScript = 'setTimeout(() => {}, 1000)'
 
+class Base64CountingWebcam extends BaseWebcam {
+  base64Calls = 0
+
+  getBase64FromBuffer(shotBuffer: Buffer) {
+    this.base64Calls += 1
+
+    return super.getBase64FromBuffer(shotBuffer)
+  }
+}
+
 describe('BaseWebcam', () => {
   it('returns a defensive copy of options', () => {
     const webcam = new BaseWebcam({ width: 640 })
@@ -274,6 +284,49 @@ describe('BaseWebcam', () => {
       )
 
       assert.deepEqual([...(result as Buffer)], [1, 2, 3])
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
+  })
+
+  it('does not build base64 output when returning buffers', async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'node-webcam-'))
+    const path = join(directory, 'photo.png')
+    const webcam = new Base64CountingWebcam({ output: 'png' })
+
+    try {
+      await webcam.capture(
+        {
+          file: process.execPath,
+          args: ['-e', writeFixtureImageScript, path]
+        },
+        path,
+        'buffer'
+      )
+
+      assert.equal(webcam.base64Calls, 0)
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
+  })
+
+  it('only builds base64 output when requested', async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'node-webcam-'))
+    const path = join(directory, 'photo.png')
+    const webcam = new Base64CountingWebcam({ output: 'png' })
+
+    try {
+      const result = await webcam.capture(
+        {
+          file: process.execPath,
+          args: ['-e', writeFixtureImageScript, path]
+        },
+        path,
+        'base64'
+      )
+
+      assert.equal(webcam.base64Calls, 1)
+      assert.equal(result, 'data:image/png;base64,AQID')
     } finally {
       rmSync(directory, { recursive: true, force: true })
     }
