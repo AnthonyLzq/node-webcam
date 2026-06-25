@@ -62,18 +62,31 @@ class Base64CountingWebcam extends BaseWebcam {
 }
 
 class FakeCaptureWebcam extends BaseWebcam {
+  static activeCaptures = 0
+  static maxActiveCaptures = 0
+
   activeCaptures = 0
   calls = 0
   failFirstCapture = false
   maxActiveCaptures = 0
 
+  static resetGlobalCaptures() {
+    FakeCaptureWebcam.activeCaptures = 0
+    FakeCaptureWebcam.maxActiveCaptures = 0
+  }
+
   protected async executeCommand(_command: { file: string; args: string[] }) {
     this.calls += 1
     const call = this.calls
     this.activeCaptures += 1
+    FakeCaptureWebcam.activeCaptures += 1
     this.maxActiveCaptures = Math.max(
       this.maxActiveCaptures,
       this.activeCaptures
+    )
+    FakeCaptureWebcam.maxActiveCaptures = Math.max(
+      FakeCaptureWebcam.maxActiveCaptures,
+      FakeCaptureWebcam.activeCaptures
     )
 
     try {
@@ -85,6 +98,7 @@ class FakeCaptureWebcam extends BaseWebcam {
       await writeFile(_command.args[0], Buffer.from([call]))
     } finally {
       this.activeCaptures -= 1
+      FakeCaptureWebcam.activeCaptures -= 1
     }
   }
 }
@@ -395,7 +409,7 @@ describe('BaseWebcam', () => {
     }
   })
 
-  it('allows concurrent captures with different output paths', async () => {
+  it('serializes concurrent captures that share the default device', async () => {
     const directory = mkdtempSync(join(tmpdir(), 'node-webcam-'))
     const firstPath = join(directory, 'first.png')
     const secondPath = join(directory, 'second.png')
@@ -418,7 +432,44 @@ describe('BaseWebcam', () => {
         )
       ])
 
-      assert.equal(webcam.maxActiveCaptures, 2)
+      assert.equal(webcam.maxActiveCaptures, 1)
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
+  })
+
+  it('allows concurrent captures with different output paths and devices', async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'node-webcam-'))
+    const firstPath = join(directory, 'first.png')
+    const secondPath = join(directory, 'second.png')
+    const firstWebcam = new FakeCaptureWebcam({
+      device: 'first-device',
+      output: 'png',
+      saveShots: false
+    })
+    const secondWebcam = new FakeCaptureWebcam({
+      device: 'second-device',
+      output: 'png',
+      saveShots: false
+    })
+
+    FakeCaptureWebcam.resetGlobalCaptures()
+
+    try {
+      await Promise.all([
+        firstWebcam.capture(
+          { file: 'fake', args: [firstPath] },
+          firstPath,
+          'buffer'
+        ),
+        secondWebcam.capture(
+          { file: 'fake', args: [secondPath] },
+          secondPath,
+          'buffer'
+        )
+      ])
+
+      assert.equal(FakeCaptureWebcam.maxActiveCaptures, 2)
     } finally {
       rmSync(directory, { recursive: true, force: true })
     }

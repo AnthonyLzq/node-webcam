@@ -29,7 +29,7 @@ export type WebcamCommand = {
 
 type CaptureReturnType = 'buffer' | 'base64'
 
-const runQueued = async <T>(key: string, task: () => Promise<T>) => {
+const runQueueKey = async <T>(key: string, task: () => Promise<T>) => {
   const previous = captureQueues.get(key) ?? Promise.resolve()
 
   let release!: () => void
@@ -53,6 +53,20 @@ const runQueued = async <T>(key: string, task: () => Promise<T>) => {
 
     if (captureQueues.get(key) === current) captureQueues.delete(key)
   }
+}
+
+const runQueued = async <T>(keys: string[], task: () => Promise<T>) => {
+  const uniqueKeys = [...new Set(keys)].sort()
+
+  const runNext = async (index: number): Promise<T> => {
+    const key = uniqueKeys[index]
+
+    if (!key) return task()
+
+    return runQueueKey(key, () => runNext(index + 1))
+  }
+
+  return runNext(0)
 }
 
 class BaseWebcam {
@@ -124,6 +138,15 @@ class BaseWebcam {
 
   protected getBackendName() {
     return this.constructor.name
+  }
+
+  protected getCaptureQueueKeys(path: string) {
+    const device = this.#options.device.trim() || 'default'
+
+    return [
+      `capture:device:${this.getBackendName()}:${device}`,
+      `capture:path:${path}`
+    ]
   }
 
   protected getElapsedMs(startedAt: number) {
@@ -212,7 +235,7 @@ class BaseWebcam {
         }
       })
 
-    return runQueued(path, async () =>
+    return runQueued(this.getCaptureQueueKeys(path), async () =>
       this.runCapture(command, path, returnType)
     )
   }
