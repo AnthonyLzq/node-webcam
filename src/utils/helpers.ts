@@ -12,6 +12,7 @@ const defaults: WebcamConfig = {
   output: 'jpeg',
   device: '',
   verbose: false,
+  timeout: 0,
   frames: 1,
   greyScale: false,
   rotation: 0,

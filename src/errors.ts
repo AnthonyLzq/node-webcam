@@ -1,10 +1,13 @@
 export type WebcamErrorCode =
   | 'BINARY_NOT_FOUND'
+  | 'COMMAND_ABORTED'
   | 'CAMERA_LIST_FAILED'
   | 'COMMAND_FAILED'
+  | 'COMMAND_TIMEOUT'
   | 'INVALID_FILE_EXTENSION'
   | 'INVALID_OUTPUT_PATH'
   | 'INVALID_RETURN_TYPE'
+  | 'INVALID_TIMEOUT'
   | 'OUTPUT_MISMATCH'
   | 'OUTPUT_READ_FAILED'
   | 'SHOT_NOT_FOUND'
@@ -38,7 +41,51 @@ const hasErrorCode = (error: unknown, code: string) => {
   return (error as { code?: unknown }).code === code
 }
 
-const getCommandErrorCode = (error: unknown): WebcamErrorCode =>
-  hasErrorCode(error, 'ENOENT') ? 'BINARY_NOT_FOUND' : 'COMMAND_FAILED'
+const hasErrorName = (error: unknown, name: string) => {
+  if (typeof error !== 'object' || error === null) return false
 
-export { WebcamError, getCommandErrorCode }
+  return (error as { name?: unknown }).name === name
+}
+
+const wasKilled = (error: unknown) => {
+  if (typeof error !== 'object' || error === null) return false
+
+  return (error as { killed?: unknown }).killed === true
+}
+
+const getCommandErrorCode = (
+  error: unknown,
+  { timeout = 0 }: { timeout?: number } = {}
+): WebcamErrorCode => {
+  if (hasErrorCode(error, 'ENOENT')) return 'BINARY_NOT_FOUND'
+
+  if (hasErrorCode(error, 'ABORT_ERR') || hasErrorName(error, 'AbortError'))
+    return 'COMMAND_ABORTED'
+
+  if (timeout > 0 && wasKilled(error)) return 'COMMAND_TIMEOUT'
+
+  return 'COMMAND_FAILED'
+}
+
+const getCommandErrorMessage = ({
+  code,
+  file,
+  timeout
+}: {
+  code: WebcamErrorCode
+  file: string
+  timeout: number
+}) => {
+  switch (code) {
+    case 'BINARY_NOT_FOUND':
+      return `Webcam command binary was not found: ${file}`
+    case 'COMMAND_TIMEOUT':
+      return `Webcam command timed out after ${timeout}ms: ${file}`
+    case 'COMMAND_ABORTED':
+      return `Webcam command was aborted: ${file}`
+    default:
+      return `Webcam command failed: ${file}`
+  }
+}
+
+export { WebcamError, getCommandErrorCode, getCommandErrorMessage }

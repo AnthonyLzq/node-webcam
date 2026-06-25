@@ -48,6 +48,7 @@ const captureConsoleOutput = async (fn: () => Promise<void>) => {
 
 const writeFixtureImageScript =
   'require("node:fs").writeFileSync(process.argv[1], Buffer.from([1, 2, 3]))'
+const waitForeverScript = 'setTimeout(() => {}, 1000)'
 
 describe('BaseWebcam', () => {
   it('returns a defensive copy of options', () => {
@@ -162,6 +163,75 @@ describe('BaseWebcam', () => {
       assert.deepEqual(error.details?.file, process.execPath)
       assert.deepEqual(error.details?.args, ['-e', 'process.exit(7)'])
     }
+  })
+
+  it('wraps timed out capture commands with a typed error', async () => {
+    const webcam = new BaseWebcam({ output: 'png', timeout: 10 })
+
+    try {
+      await webcam.capture(
+        { file: process.execPath, args: ['-e', waitForeverScript] },
+        'photo.png',
+        'buffer'
+      )
+      assert.fail('Expected timeout failure')
+    } catch (error) {
+      assert.ok(error instanceof WebcamError)
+      assert.equal(error.code, 'COMMAND_TIMEOUT')
+      assert.equal(
+        error.message,
+        `Webcam command timed out after 10ms: ${process.execPath}`
+      )
+      assert.equal(error.details?.timeout, 10)
+      assert.equal(typeof error.details?.elapsedMs, 'number')
+    }
+  })
+
+  it('wraps aborted capture commands with a typed error', async () => {
+    const controller = new AbortController()
+    const webcam = new BaseWebcam({
+      output: 'png',
+      signal: controller.signal
+    })
+    const timer = setTimeout(() => controller.abort(), 10)
+
+    try {
+      await webcam.capture(
+        { file: process.execPath, args: ['-e', waitForeverScript] },
+        'photo.png',
+        'buffer'
+      )
+      assert.fail('Expected abort failure')
+    } catch (error) {
+      assert.ok(error instanceof WebcamError)
+      assert.equal(error.code, 'COMMAND_ABORTED')
+      assert.equal(
+        error.message,
+        `Webcam command was aborted: ${process.execPath}`
+      )
+      assert.equal(error.details?.signalAborted, true)
+      assert.equal(typeof error.details?.elapsedMs, 'number')
+    } finally {
+      clearTimeout(timer)
+    }
+  })
+
+  it('rejects invalid capture timeouts before executing commands', async () => {
+    const webcam = new BaseWebcam({ output: 'png', timeout: -1 })
+
+    await assert.rejects(
+      () =>
+        webcam.capture(
+          { file: 'should-not-run', args: [] },
+          'photo.png',
+          'buffer'
+        ),
+      {
+        code: 'INVALID_TIMEOUT',
+        message: 'Invalid timeout: -1',
+        name: 'WebcamError'
+      }
+    )
   })
 
   it('wraps missing capture output with a typed error', async () => {

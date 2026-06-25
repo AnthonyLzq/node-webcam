@@ -2,7 +2,11 @@ import { execFile } from 'child_process'
 import { readFileSync } from 'fs'
 import { promisify } from 'util'
 
-import { WebcamError, getCommandErrorCode } from '../errors'
+import {
+  WebcamError,
+  getCommandErrorCode,
+  getCommandErrorMessage
+} from '../errors'
 import { logDiagnostic } from '../logger'
 import {
   Shot,
@@ -164,6 +168,15 @@ class BaseWebcam {
         }
       })
 
+    if (!Number.isFinite(this.#options.timeout) || this.#options.timeout < 0)
+      throw new WebcamError({
+        code: 'INVALID_TIMEOUT',
+        message: `Invalid timeout: ${this.#options.timeout}`,
+        details: {
+          timeout: this.#options.timeout
+        }
+      })
+
     const operationId = this.createDiagnosticId('capture')
     const startedAt = Date.now()
     const diagnosticBase = {
@@ -172,24 +185,30 @@ class BaseWebcam {
       file: command.file,
       operationId,
       path,
-      returnType
+      returnType,
+      timeout: this.#options.timeout
     }
 
     this.logDiagnostic('capture:start', diagnosticBase)
 
     try {
       await asyncExecFile(command.file, command.args, {
-        maxBuffer: 1024 * 10_000
+        maxBuffer: 1024 * 10_000,
+        signal: this.#options.signal,
+        timeout: this.#options.timeout
       })
     } catch (error) {
-      const code = getCommandErrorCode(error)
+      const code = getCommandErrorCode(error, {
+        timeout: this.#options.timeout
+      })
       const elapsedMs = this.getElapsedMs(startedAt)
       const typedError = new WebcamError({
         code,
-        message:
-          code === 'BINARY_NOT_FOUND'
-            ? `Webcam command binary was not found: ${command.file}`
-            : `Webcam command failed: ${command.file}`,
+        message: getCommandErrorMessage({
+          code,
+          file: command.file,
+          timeout: this.#options.timeout
+        }),
         cause: error,
         details: {
           args: command.args,
@@ -197,7 +216,9 @@ class BaseWebcam {
           file: command.file,
           operationId,
           path,
-          returnType
+          returnType,
+          signalAborted: this.#options.signal?.aborted ?? false,
+          timeout: this.#options.timeout
         }
       })
 

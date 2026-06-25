@@ -31,6 +31,12 @@ export type WebcamConfig = {
   // Logging
   verbose: boolean // false
 
+  // Maximum capture command runtime in milliseconds. 0 disables timeout.
+  timeout: number // 0
+
+  // AbortSignal used to cancel an in-flight capture command
+  signal?: AbortSignal
+
   // Frames
   frames: number // 1
 
