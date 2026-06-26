@@ -40,6 +40,12 @@
     }
   ],
   "types": "dist/index.d.ts",
+  "files": [
+    "bin/postinstall.js",
+    "dist",
+    "LICENSE",
+    "README.md"
+  ],
   "license": "MIT",
   "bugs": {
     "url": "https://github.com/AnthonyLzq/node-webcam/issues"
