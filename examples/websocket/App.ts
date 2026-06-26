@@ -1,11 +1,16 @@
 import http from 'http'
 import { readFileSync } from 'fs'
-import { resolve } from 'path'
-import { platform } from 'os'
+import { join, resolve } from 'path'
+import { platform, tmpdir } from 'os'
 import ws from 'ws'
 
 import { capture } from '../../dist/'
 
+const CAPTURE_INTERVAL_MS = 2500
+const CAPTURE_LOCATION = join(
+  tmpdir(),
+  `node-webcam-websocket-${process.pid}.jpg`
+)
 const PORT = 9090
 const html = readFileSync(resolve(__dirname, 'www/index.html'))
 const wss = new ws.Server({ port: 9091 })
@@ -29,17 +34,29 @@ const setupHTTP = () => {
 }
 
 const setupWebcam = () => {
-  setInterval(async () => {
-    const result = await capture({
-      location: resolve(__dirname, 'picture.jpg'),
-      type: platform(),
-      options: {
-        output: 'jpg'
-      }
-    })
+  const captureFrame = async () => {
+    try {
+      if (wss.clients.size === 0) return
 
-    broadcast(result)
-  }, 2500)
+      const result = await capture({
+        location: CAPTURE_LOCATION,
+        type: platform(),
+        returnType: 'base64',
+        options: {
+          output: 'jpg',
+          saveShots: false
+        }
+      })
+
+      broadcast(result)
+    } catch (error) {
+      console.error('Unable to capture webcam frame:', error)
+    } finally {
+      setTimeout(captureFrame, CAPTURE_INTERVAL_MS)
+    }
+  }
+
+  captureFrame()
 }
 
 // Main
