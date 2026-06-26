@@ -8,6 +8,7 @@ import {
   getCommandErrorMessage
 } from '../errors'
 import { logDiagnostic } from '../logger'
+import { recordCaptureMetric } from '../metrics'
 import {
   Shot,
   getLinuxCameras,
@@ -235,15 +236,18 @@ class BaseWebcam {
         }
       })
 
+    const queuedAt = Date.now()
+
     return runQueued(this.getCaptureQueueKeys(path), async () =>
-      this.runCapture(command, path, returnType)
+      this.runCapture(command, path, returnType, Date.now() - queuedAt)
     )
   }
 
   private async runCapture(
     command: WebcamCommand,
     path: string,
-    returnType: CaptureReturnType
+    returnType: CaptureReturnType,
+    queueWaitMs: number
   ) {
     const operationId = this.createDiagnosticId('capture')
     const startedAt = Date.now()
@@ -253,6 +257,7 @@ class BaseWebcam {
       file: command.file,
       operationId,
       path,
+      queueWaitMs,
       returnType,
       timeout: this.#options.timeout
     }
@@ -286,6 +291,16 @@ class BaseWebcam {
         }
       })
 
+      recordCaptureMetric({
+        backend: this.getBackendName(),
+        bytes: 0,
+        code,
+        elapsedMs,
+        queueWaitMs,
+        returnType,
+        status: 'failed'
+      })
+
       this.logDiagnostic(
         'capture:error',
         {
@@ -317,6 +332,16 @@ class BaseWebcam {
         }
       })
 
+      recordCaptureMetric({
+        backend: this.getBackendName(),
+        bytes: 0,
+        code: 'OUTPUT_READ_FAILED',
+        elapsedMs,
+        queueWaitMs,
+        returnType,
+        status: 'failed'
+      })
+
       this.logDiagnostic(
         'capture:error',
         {
@@ -332,12 +357,23 @@ class BaseWebcam {
 
     if (this.#options.saveShots) this.#shots.push(this.createShot(path, buffer))
 
+    const elapsedMs = this.getElapsedMs(startedAt)
+
+    recordCaptureMetric({
+      backend: this.getBackendName(),
+      bytes: buffer.length,
+      elapsedMs,
+      queueWaitMs,
+      returnType,
+      status: 'succeeded'
+    })
+
     this.logDiagnostic(
       'capture:success',
       {
         ...diagnosticBase,
         bytes: buffer.length,
-        elapsedMs: this.getElapsedMs(startedAt)
+        elapsedMs
       },
       'info'
     )

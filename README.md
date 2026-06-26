@@ -124,6 +124,19 @@ Standalone exe included. See [src/bindings/CommandCam](https://github.com/chuckf
    */
   ```
 
+- In case you want aggregate capture metrics, you can use the optional metrics helpers:
+
+  ```ts
+  import { getMetricsReport, resetMetrics } from '@anthonylzq/node-webcam'
+
+  const metrics = getMetricsReport()
+
+  console.log(metrics.captures.total)
+  console.log(metrics.captures.averageElapsedMs)
+
+  resetMetrics()
+  ```
+
 ## Author
 
 - **Charlie Abeling** - _Initial Work_ - _Documentation_ - [chuckfairy](https://github.com/chuckfairy).

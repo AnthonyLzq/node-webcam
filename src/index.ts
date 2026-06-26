@@ -56,6 +56,8 @@ export {
 }
 export { defaults } from './utils'
 export { WebcamError } from './errors'
+export { getMetricsReport, resetMetrics } from './metrics'
 
 export type NodeWebcamConfig = WebcamConfig
 export type { WebcamErrorCode } from './errors'
+export type { WebcamCaptureMetrics, WebcamMetricsReport } from './metrics'
