@@ -42,12 +42,15 @@ const capture = async (
   return result
 }
 
-const list = async (type: string) => create({}, type).listWebcams()
+const list = (type: string) => create({}, type).list()
+
+const listWebcams = async (type: string) => create({}, type).listWebcams()
 
 export {
   create,
   capture,
   list,
+  listWebcams,
   Factory,
   BaseWebcam,
   FSWebcam,

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
-import { list } from '../src'
+import { list, listWebcams } from '../src'
 import { WebcamError } from '../src/errors'
 import {
   getCameras,
@@ -84,19 +84,30 @@ describe('camera listing', () => {
     )
   })
 
-  it('exposes top-level list as the common async listing API', async () => {
-    const cameras = await list('linux')
+  it('preserves top-level list as a synchronous legacy API', () => {
+    const cameras = list('linux')
+
+    assert.ok(Array.isArray(cameras))
+  })
+
+  it('exposes top-level listWebcams as the async listing API', async () => {
+    const cameras = await listWebcams('linux')
 
     assert.ok(Array.isArray(cameras))
   })
 
   it('preserves typed errors from top-level list factory validation', async () => {
-    await assert.rejects(() => list('unsupported'), {
+    assert.throws(() => list('unsupported'), {
       code: 'UNSUPPORTED_WEBCAM_TYPE',
       name: 'WebcamError'
     })
 
-    await list('unsupported').catch(error => {
+    await assert.rejects(() => listWebcams('unsupported'), {
+      code: 'UNSUPPORTED_WEBCAM_TYPE',
+      name: 'WebcamError'
+    })
+
+    await listWebcams('unsupported').catch(error => {
       assert.ok(error instanceof WebcamError)
     })
   })

@@ -1,5 +1,6 @@
 import { execFile } from 'child_process'
 import { readFile } from 'fs/promises'
+import { resolve } from 'path'
 import { promisify } from 'util'
 
 import {
@@ -142,11 +143,14 @@ class BaseWebcam {
   }
 
   protected getCaptureQueueKeys(path: string) {
-    const device = this.#options.device.trim() || 'default'
+    const device =
+      typeof this.#options.device === 'string' && this.#options.device.trim()
+        ? this.#options.device.trim()
+        : 'default'
 
     return [
       `capture:device:${this.getBackendName()}:${device}`,
-      `capture:path:${path}`
+      `capture:path:${resolve(path)}`
     ]
   }
 

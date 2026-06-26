@@ -2,12 +2,12 @@ import assert from 'node:assert/strict'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, relative } from 'node:path'
 import { describe, it } from 'node:test'
 
 import { WebcamError } from '../src/errors'
 import { resetLogger, setLogger, WebcamLogEntry } from '../src/logger'
-import { BaseWebcam } from '../src/webcams/BaseWebcam'
+import { BaseWebcam, WebcamCommand } from '../src/webcams/BaseWebcam'
 import { Shot } from '../src/utils'
 
 type ConsoleCall = {
@@ -75,7 +75,9 @@ class FakeCaptureWebcam extends BaseWebcam {
     FakeCaptureWebcam.maxActiveCaptures = 0
   }
 
-  protected async executeCommand(_command: { file: string; args: string[] }) {
+  protected async executeCommand(command: WebcamCommand | string) {
+    if (typeof command === 'string') throw new Error('Unexpected shell command')
+
     this.calls += 1
     const call = this.calls
     this.activeCaptures += 1
@@ -95,7 +97,7 @@ class FakeCaptureWebcam extends BaseWebcam {
       if (this.failFirstCapture && call === 1)
         throw new Error('fake capture failed')
 
-      await writeFile(_command.args[0], Buffer.from([call]))
+      await writeFile(command.args[0], Buffer.from([call]))
     } finally {
       this.activeCaptures -= 1
       FakeCaptureWebcam.activeCaptures -= 1
@@ -401,6 +403,73 @@ describe('BaseWebcam', () => {
       await Promise.all([
         webcam.capture({ file: 'fake', args: [path] }, path, 'buffer'),
         webcam.capture({ file: 'fake', args: [path] }, path, 'buffer')
+      ])
+
+      assert.equal(webcam.maxActiveCaptures, 1)
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
+  })
+
+  it('serializes same-file captures with relative and absolute paths', async () => {
+    const directory = mkdtempSync(join(process.cwd(), '.tmp-node-webcam-'))
+    const absolutePath = join(directory, 'photo.png')
+    const relativePath = relative(process.cwd(), absolutePath)
+    const firstWebcam = new FakeCaptureWebcam({
+      device: 'first-device',
+      output: 'png',
+      saveShots: false
+    })
+    const secondWebcam = new FakeCaptureWebcam({
+      device: 'second-device',
+      output: 'png',
+      saveShots: false
+    })
+
+    FakeCaptureWebcam.resetGlobalCaptures()
+
+    try {
+      await Promise.all([
+        firstWebcam.capture(
+          { file: 'fake', args: [relativePath] },
+          relativePath,
+          'buffer'
+        ),
+        secondWebcam.capture(
+          { file: 'fake', args: [absolutePath] },
+          absolutePath,
+          'buffer'
+        )
+      ])
+
+      assert.equal(FakeCaptureWebcam.maxActiveCaptures, 1)
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
+  })
+
+  it('treats device false as the default device for queues', async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'node-webcam-'))
+    const firstPath = join(directory, 'first.png')
+    const secondPath = join(directory, 'second.png')
+    const webcam = new FakeCaptureWebcam({
+      device: false,
+      output: 'png',
+      saveShots: false
+    })
+
+    try {
+      await Promise.all([
+        webcam.capture(
+          { file: 'fake', args: [firstPath] },
+          firstPath,
+          'buffer'
+        ),
+        webcam.capture(
+          { file: 'fake', args: [secondPath] },
+          secondPath,
+          'buffer'
+        )
       ])
 
       assert.equal(webcam.maxActiveCaptures, 1)
@@ -731,6 +800,15 @@ describe('BaseWebcam', () => {
 })
 
 describe('Shot', () => {
+  it('copies constructor input data', () => {
+    const data = Buffer.from([1, 2, 3])
+    const shot = new Shot('photo.jpeg', data)
+
+    data[0] = 9
+
+    assert.deepEqual([...shot.data], [1, 2, 3])
+  })
+
   it('returns defensive copies of captured data', () => {
     const shot = new Shot('photo.jpeg', Buffer.from([1, 2, 3]))
     const data = shot.data

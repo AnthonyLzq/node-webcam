@@ -26,7 +26,7 @@ export type WebcamConfig = {
   // Which camera to use
   // Use Webcam.list() for results
   // false for default device
-  device: string // '
+  device: string | false // ''
 
   // Logging
   verbose: boolean // false

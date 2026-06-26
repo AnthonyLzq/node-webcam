@@ -4,7 +4,7 @@ class Shot {
 
   constructor(location: string, data: Buffer) {
     this.#location = location
-    this.#data = data
+    this.#data = Buffer.from(data)
   }
 
   get location() {
