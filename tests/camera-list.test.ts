@@ -14,8 +14,8 @@ import {
 import { BaseWebcam } from '../src/webcams/BaseWebcam'
 
 describe('camera listing', () => {
-  it('returns an array from the legacy synchronous list API', () => {
-    const cameras = new BaseWebcam({}).list()
+  it('returns an array from the deprecated async list API', async () => {
+    const cameras = await new BaseWebcam({}).list()
 
     assert.ok(Array.isArray(cameras))
   })
@@ -84,8 +84,8 @@ describe('camera listing', () => {
     )
   })
 
-  it('preserves top-level list as a synchronous legacy API', () => {
-    const cameras = list('linux')
+  it('exposes top-level list as a deprecated async listing API', async () => {
+    const cameras = await list('linux')
 
     assert.ok(Array.isArray(cameras))
   })
@@ -97,7 +97,7 @@ describe('camera listing', () => {
   })
 
   it('preserves typed errors from top-level list factory validation', async () => {
-    assert.throws(() => list('unsupported'), {
+    await assert.rejects(() => list('unsupported'), {
       code: 'UNSUPPORTED_WEBCAM_TYPE',
       name: 'WebcamError'
     })
