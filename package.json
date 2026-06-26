@@ -11,7 +11,7 @@
     "lint": "npm run lint:check",
     "lint:check": "eslint src tests --ext .ts",
     "lint:fix": "eslint --fix src tests --ext .ts",
-    "pack:check": "npm pack --dry-run",
+    "pack:check": "npm run check && npm run build && node scripts/validate-pack.js",
     "prepare": "npm run build",
     "prepack": "npm run check",
     "typecheck": "tsc --noEmit",
@@ -44,6 +44,13 @@
     }
   ],
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
   "files": [
     "bin/postinstall.js",
     "dist",
