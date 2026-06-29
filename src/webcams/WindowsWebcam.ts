@@ -1,8 +1,11 @@
 import { resolve } from 'path'
 
+import { WebcamError } from '../errors'
 import type { WebcamConfig } from '../types'
 import { getPlatformCameras } from '../utils'
 import { BaseWebcam, WebcamCommand } from './BaseWebcam'
+
+const COMMAND_CAM_MAX_ARGUMENT_BYTES = 99
 
 class WindowsWebcam extends BaseWebcam {
   #bin: string
@@ -48,6 +51,23 @@ class WindowsWebcam extends BaseWebcam {
     args.push('/filename', location)
 
     return { file: this.#bin, args }
+  }
+
+  protected validateOutputPath(path: string) {
+    super.validateOutputPath(path)
+
+    const bytes = Buffer.byteLength(path, 'utf8')
+
+    if (bytes > COMMAND_CAM_MAX_ARGUMENT_BYTES)
+      throw new WebcamError({
+        code: 'INVALID_OUTPUT_PATH',
+        message: `Invalid Windows output path, CommandCam paths must be ${COMMAND_CAM_MAX_ARGUMENT_BYTES} bytes or less: ${bytes}`,
+        details: {
+          bytes,
+          maxBytes: COMMAND_CAM_MAX_ARGUMENT_BYTES,
+          path
+        }
+      })
   }
 
   async listWebcams(): Promise<string[]> {

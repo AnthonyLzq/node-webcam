@@ -150,6 +150,22 @@ describe('backend command generation', () => {
     })
   })
 
+  it('rejects Windows CommandCam output paths longer than its native buffer', () => {
+    const webcam = new WindowsWebcam({})
+    const longPath = `${'a'.repeat(96)}.bmp`
+
+    assert.throws(() => webcam.generateCommand(longPath), {
+      code: 'INVALID_OUTPUT_PATH',
+      message:
+        'Invalid Windows output path, CommandCam paths must be 99 bytes or less: 100',
+      name: 'WebcamError'
+    })
+    assert.throws(() => webcam.generateSh(longPath), {
+      code: 'INVALID_OUTPUT_PATH',
+      name: 'WebcamError'
+    })
+  })
+
   it('keeps shell metacharacters inside fswebcam argument values', () => {
     const webcam = new FSWebcam({
       title: 'hello; rm -rf /',
