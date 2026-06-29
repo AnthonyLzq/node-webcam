@@ -166,6 +166,21 @@ describe('backend command generation', () => {
     })
   })
 
+  it('rejects Windows CommandCam output paths containing double quotes', () => {
+    const webcam = new WindowsWebcam({})
+
+    assert.throws(() => webcam.generateCommand('"quoted.bmp'), {
+      code: 'INVALID_OUTPUT_PATH',
+      message:
+        'Invalid Windows output path, CommandCam paths must not contain double quotes',
+      name: 'WebcamError'
+    })
+    assert.throws(() => webcam.generateSh('quoted".bmp'), {
+      code: 'INVALID_OUTPUT_PATH',
+      name: 'WebcamError'
+    })
+  })
+
   it('keeps shell metacharacters inside fswebcam argument values', () => {
     const webcam = new FSWebcam({
       title: 'hello; rm -rf /',

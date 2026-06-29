@@ -58,6 +58,14 @@ class WindowsWebcam extends BaseWebcam {
 
     const bytes = Buffer.byteLength(path, 'utf8')
 
+    if (path.includes('"'))
+      throw new WebcamError({
+        code: 'INVALID_OUTPUT_PATH',
+        message:
+          'Invalid Windows output path, CommandCam paths must not contain double quotes',
+        details: { path }
+      })
+
     if (bytes > COMMAND_CAM_MAX_ARGUMENT_BYTES)
       throw new WebcamError({
         code: 'INVALID_OUTPUT_PATH',
