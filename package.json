@@ -3,6 +3,9 @@
   "version": "2.1.0",
   "description": "Cross platform webcam capture",
   "main": "dist/index.js",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "build": "npm run rm:dist && tsc -p tsconfig.build.json && cp -r src/bindings dist",
     "check": "npm run typecheck && npm run lint:check && npm test",
@@ -63,7 +66,7 @@
   },
   "homepage": "https://github.com/AnthonyLzq/node-webcam#readme",
   "devDependencies": {
-    "@types/node": "^18.11.18",
+    "@types/node": "22.20.0",
     "@types/ws": "^8.5.3",
     "@typescript-eslint/eslint-plugin": "^5.47.1",
     "@typescript-eslint/parser": "^5.47.1",

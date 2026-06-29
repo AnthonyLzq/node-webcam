@@ -31,7 +31,6 @@ class WebcamError extends Error {
     this.code = code
     this.cause = cause
     this.details = details
-    Object.setPrototypeOf(this, new.target.prototype)
   }
 }
 

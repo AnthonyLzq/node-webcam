@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
-    "target": "ES2015",
-    "module": "Node16",
+    "target": "ES2022",
+    "module": "NodeNext",
     "allowJs": true,
     "declaration": true,
     "outDir": "dist",
@@ -9,7 +9,7 @@
     "removeComments": true,
     "strict": true,
     "noImplicitAny": true,
-    "moduleResolution": "node16",
+    "moduleResolution": "nodenext",
     "types": ["node"],
     "esModuleInterop": true,
     "resolveJsonModule": true,
