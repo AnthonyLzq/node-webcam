@@ -16,8 +16,10 @@ const requiredPackageEntries = [
   'LICENSE',
   'README.md',
   'bin/postinstall.js',
-  'dist/index.d.ts',
-  'dist/index.js',
+  'dist/cjs/index.js',
+  'dist/esm/index.js',
+  'dist/esm/package.json',
+  'dist/types/index.d.ts',
   'package.json'
 ]
 
@@ -42,6 +44,7 @@ let consumerDirectory
 
 try {
   const pack = parsePackOutput(exec('npm', ['pack', '--json', '--ignore-scripts']))
+  tarballPath = join(root, pack.filename)
   const packageEntries = pack.files.map(file => file.path)
   const forbiddenEntries = packageEntries.filter(entry =>
     forbiddenPackageEntries.test(entry)
@@ -60,7 +63,6 @@ try {
       `Required entries missing from package tarball: ${missingEntries.join(', ')}`
     )
 
-  tarballPath = join(root, pack.filename)
   consumerDirectory = mkdtempSync(join(tmpdir(), 'node-webcam-consumer-'))
 
   writeFileSync(
@@ -102,7 +104,36 @@ try {
   )
 
   writeFileSync(
+    join(consumerDirectory, 'index.mjs'),
+    [
+      "import * as webcam from '@anthonylzq/node-webcam'",
+      "for (const key of ['capture', 'create', 'list', 'listWebcams', 'getMetricsReport', 'resetMetrics']) {",
+      "  if (typeof webcam[key] !== 'function') throw new Error(`Missing ESM export: ${key}`)",
+      '}'
+    ].join('\n')
+  )
+
+  execFileSync(process.execPath, ['index.mjs'], {
+    cwd: consumerDirectory,
+    stdio: 'ignore'
+  })
+
+  writeFileSync(
     join(consumerDirectory, 'index.ts'),
+    [
+      "import { create, getMetricsReport, listWebcams, type NodeWebcamConfig, type WebcamMetricsReport } from '@anthonylzq/node-webcam'",
+      "const options: Partial<NodeWebcamConfig> = { device: false, output: 'jpg', timeout: 1 }",
+      "const webcam = create(options, 'linux')",
+      'void webcam.listWebcams()',
+      "void listWebcams('linux')",
+      'const report: WebcamMetricsReport = getMetricsReport()',
+      'const total: number = report.captures.total',
+      'void total'
+    ].join('\n')
+  )
+
+  writeFileSync(
+    join(consumerDirectory, 'index.mts'),
     [
       "import { create, getMetricsReport, listWebcams, type NodeWebcamConfig, type WebcamMetricsReport } from '@anthonylzq/node-webcam'",
       "const options: Partial<NodeWebcamConfig> = { device: false, output: 'jpg', timeout: 1 }",
@@ -127,7 +158,7 @@ try {
           target: 'ES2020',
           typeRoots: [join(root, 'node_modules', '@types')]
         },
-        include: ['index.ts']
+        include: ['index.ts', 'index.mts']
       },
       null,
       2

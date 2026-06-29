@@ -2,12 +2,16 @@
   "name": "@anthonylzq/node-webcam",
   "version": "2.1.0",
   "description": "Cross platform webcam capture",
-  "main": "dist/index.js",
+  "main": "dist/cjs/index.js",
+  "module": "dist/esm/index.js",
   "engines": {
     "node": ">=22"
   },
   "scripts": {
-    "build": "npm run rm:dist && tsc -p tsconfig.build.json && cp -r src/bindings dist",
+    "build": "npm run rm:dist && npm run build:cjs && npm run build:esm && npm run build:types && node scripts/prepare-esm.js && cp -r src/bindings dist/cjs && cp -r src/bindings dist/esm",
+    "build:cjs": "tsc -p tsconfig.cjs.json",
+    "build:esm": "tsc -p tsconfig.esm.json",
+    "build:types": "tsc -p tsconfig.types.json",
     "check": "npm run typecheck && npm run lint:check && npm test",
     "postinstall": "node ./bin/postinstall.js",
     "demo": "npm run build && ts-node examples/websocket/App.ts",
@@ -46,12 +50,13 @@
       "email": "sluzquinosa@uni.pe"
     }
   ],
-  "types": "dist/index.d.ts",
+  "types": "dist/types/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "require": "./dist/index.js",
-      "default": "./dist/index.js"
+      "types": "./dist/types/index.d.ts",
+      "import": "./dist/esm/index.js",
+      "require": "./dist/cjs/index.js",
+      "default": "./dist/esm/index.js"
     }
   },
   "files": [
