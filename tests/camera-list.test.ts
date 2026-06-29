@@ -1,4 +1,7 @@
 import assert from 'node:assert/strict'
+import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { describe, it } from 'node:test'
 
 import { list, listWebcams } from '../src'
@@ -82,6 +85,31 @@ describe('camera listing', () => {
       ),
       ['Integrated Webcam', 'USB Camera']
     )
+  })
+
+  it('parses successful Windows CommandCam list output from stderr', async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'node-webcam-commandcam-'))
+    const commandCam = join(directory, 'CommandCam')
+
+    writeFileSync(
+      commandCam,
+      [
+        '#!/usr/bin/env node',
+        "process.stderr.write('Available capture devices:\\nIntegrated Webcam\\nUSB Camera\\n')"
+      ].join('\n')
+    )
+    chmodSync(commandCam, 0o755)
+
+    try {
+      const cameras = await getPlatformCameras({
+        platform: 'win32',
+        windowsCommandCamPath: commandCam
+      })
+
+      assert.deepEqual(cameras, ['Integrated Webcam', 'USB Camera'])
+    } finally {
+      rmSync(directory, { force: true, recursive: true })
+    }
   })
 
   it('exposes top-level list as a deprecated async listing API', async () => {

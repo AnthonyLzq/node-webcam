@@ -81,14 +81,7 @@ const runCameraListCommand = async ({ args, file }: CameraListCommand) => {
   try {
     const result = await asyncExecFile(file, args)
 
-    if (result.stderr)
-      throw new WebcamError({
-        code: 'CAMERA_LIST_FAILED',
-        message: result.stderr,
-        details: { args, file }
-      })
-
-    return result.stdout
+    return result
   } catch (error) {
     if (error instanceof WebcamError) throw error
 
@@ -113,19 +106,28 @@ const getPlatformCameras = async ({
   switch (platform) {
     case 'linux':
       return getLinuxCameras()
-    case 'darwin':
-      return parseImageSnapCameras(
-        await runCameraListCommand(getImageSnapListCommand())
-      )
+    case 'darwin': {
+      const command = getImageSnapListCommand()
+      const { stderr, stdout } = await runCameraListCommand(command)
+
+      if (stderr)
+        throw new WebcamError({
+          code: 'CAMERA_LIST_FAILED',
+          message: stderr,
+          details: command
+        })
+
+      return parseImageSnapCameras(stdout)
+    }
     case 'win32':
-    case 'win64':
-      return parseWindowsCameras(
-        await runCameraListCommand(
-          windowsCommandCamPath
-            ? getWindowsListCommand(windowsCommandCamPath)
-            : getDefaultWindowsListCommand()
-        )
-      )
+    case 'win64': {
+      const command = windowsCommandCamPath
+        ? getWindowsListCommand(windowsCommandCamPath)
+        : getDefaultWindowsListCommand()
+      const { stderr, stdout } = await runCameraListCommand(command)
+
+      return parseWindowsCameras(stdout || stderr)
+    }
     default:
       return []
   }
