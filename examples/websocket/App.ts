@@ -1,7 +1,7 @@
 import http from 'http'
 import { readFileSync } from 'fs'
 import { join, resolve } from 'path'
-import { platform, tmpdir } from 'os'
+import { tmpdir } from 'os'
 import ws from 'ws'
 
 import { capture } from '@anthonylzq/node-webcam'
@@ -16,7 +16,7 @@ const html = readFileSync(resolve(__dirname, 'www/index.html'))
 const wss = new ws.Server({ port: 9091 })
 
 // Broadcast to all.
-const broadcast = (base64Result: string | Buffer) => {
+const broadcast = (base64Result: string) => {
   wss.clients.forEach(client => {
     client.send(base64Result)
   })
@@ -40,15 +40,13 @@ const setupWebcam = () => {
 
       const result = await capture({
         location: CAPTURE_LOCATION,
-        type: platform(),
-        returnType: 'base64',
         options: {
           output: 'jpg',
           saveShots: false
         }
       })
 
-      broadcast(result)
+      broadcast(result.toBase64())
     } catch (error) {
       console.error('Unable to capture webcam frame:', error)
     } finally {

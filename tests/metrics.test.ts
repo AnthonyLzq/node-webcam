@@ -13,10 +13,30 @@ const waitForeverScript = 'setTimeout(() => {}, 1000)'
 class MetricsWebcam extends BaseWebcam {
   calls = 0
 
+  generateCommand(location: string) {
+    return { file: 'fake', args: [location] }
+  }
+
   protected async executeCommand(command: WebcamCommand) {
     this.calls += 1
     await new Promise(resolve => setTimeout(resolve, 10))
     await writeFile(command.args[0], Buffer.from([1, 2, 3, 4]))
+  }
+}
+
+class CommandWebcam extends BaseWebcam {
+  #command: WebcamCommand
+
+  constructor(
+    options: ConstructorParameters<typeof BaseWebcam>[0],
+    command: WebcamCommand
+  ) {
+    super(options)
+    this.#command = command
+  }
+
+  generateCommand() {
+    return this.#command
   }
 }
 
@@ -55,7 +75,7 @@ describe('metrics', () => {
     const webcam = new MetricsWebcam({ output: 'png', saveShots: false })
 
     try {
-      await webcam.capture({ file: 'fake', args: [path] }, path, 'buffer')
+      await webcam.capture({ location: path })
 
       const report = getMetricsReport()
 
@@ -73,31 +93,33 @@ describe('metrics', () => {
   })
 
   it('records timeout and abort failures', async () => {
-    const timeoutWebcam = new BaseWebcam({ output: 'png', timeout: 10 })
+    const timeoutWebcam = new CommandWebcam(
+      { output: 'png', timeout: 10 },
+      { file: process.execPath, args: ['-e', waitForeverScript] }
+    )
     const controller = new AbortController()
-    const abortedWebcam = new BaseWebcam({
-      output: 'png',
-      signal: controller.signal
-    })
+    const abortedWebcam = new CommandWebcam(
+      {
+        output: 'png',
+        signal: controller.signal
+      },
+      { file: process.execPath, args: ['-e', waitForeverScript] }
+    )
     const timer = setTimeout(() => controller.abort(), 10)
 
     try {
       await assert.rejects(
         () =>
-          timeoutWebcam.capture(
-            { file: process.execPath, args: ['-e', waitForeverScript] },
-            'timeout.png',
-            'buffer'
-          ),
+          timeoutWebcam.capture({
+            location: 'timeout.png'
+          }),
         { code: 'COMMAND_TIMEOUT' }
       )
       await assert.rejects(
         () =>
-          abortedWebcam.capture(
-            { file: process.execPath, args: ['-e', waitForeverScript] },
-            'aborted.png',
-            'buffer'
-          ),
+          abortedWebcam.capture({
+            location: 'aborted.png'
+          }),
         { code: 'COMMAND_ABORTED' }
       )
 
@@ -119,8 +141,8 @@ describe('metrics', () => {
 
     try {
       await Promise.all([
-        webcam.capture({ file: 'fake', args: [path] }, path, 'buffer'),
-        webcam.capture({ file: 'fake', args: [path] }, path, 'buffer')
+        webcam.capture({ location: path }),
+        webcam.capture({ location: path })
       ])
 
       const report = getMetricsReport()

@@ -13,9 +13,9 @@ Cross platform webcam usage
 sudo apt-get install fswebcam
 
 # arch
-# fswebcam requires a build from the AUR, it is not listed for installation on pacman/pamac
+# fswebcam requires a build from the AUR
 
-sudo pamac build fswebcam
+yay -S fswebcam
 ```
 
 ### Mac OSX
@@ -39,60 +39,51 @@ Standalone exe included. See [src/bindings/CommandCam](https://github.com/chuckf
 - The simplest use case:
 
   ```ts
-  import { platform } from 'os'
   import { capture } from '@anthonylzq/node-webcam'
 
   const main = async () => {
-    // base64 as default
     const result = await capture({
-      location: resolve(__dirname, 'picture.jpeg'),
-      type: platform()
+      location: 'picture.jpeg'
     })
 
-    console.log('result', result)
+    console.log('buffer', result.buffer)
+    console.log('base64', result.toBase64())
   }
   ```
 
 - In case you want to use another file type such as `jpg`, `png` or `bmp` you **must** indicate it in the `options` object, otherwise you will get an error:
 
   ```ts
-  import { platform } from 'os'
   import { capture } from '@anthonylzq/node-webcam'
 
   const main = async () => {
     const result = await capture({
-      location: resolve(__dirname, 'picture.png'),
-      type: platform(),
-      returnType: 'buffer'
+      location: 'picture.png',
       options: {
         output: 'png'
       }
     })
 
-    console.log('result', result)
+    console.log('buffer', result.buffer)
   }
   ```
 
-  This is because in order to build properly the base64 image both attributes must match.
+  This is because in order to build the captured image correctly the file extension and output type must match.
 
 - In case you need something more advance you can use the `create` function that will give you a class that will handle the usage of the webcam for you.
 
   ```ts
-  import { platform } from 'os'
   import { create } from '@anthonylzq/node-webcam'
 
-  // The supported platforms are: linux, darwin, win32 and win64.
-  // Besides you can use 'fswebcam' as second parameter instead of "platform()"
-  const Webcam = create({}, platform())
+  const webcam = create()
   ```
 
-- In case you want to list the available cameras in your OS, you can use the `list` function:
+- In case you want to list the available cameras in your OS, you can use the `listWebcams` function:
 
   ```ts
-  import { platform } from 'os'
-  import { create } from '@anthonylzq/node-webcam'
+  import { listWebcams } from '@anthonylzq/node-webcam'
 
-  const cameras = create({}, platform())
+  const cameras = await listWebcams()
   ```
 
 - The default configuration for all the webcams classes and methods can be found in the `defaults` object:
@@ -105,6 +96,7 @@ Standalone exe included. See [src/bindings/CommandCam](https://github.com/chuckf
    * {
    *   width: 1280,
    *   height: 720,
+   *   quality: 100,
    *   delay: 0,
    *   title: '',
    *   subtitle: '',
@@ -112,8 +104,8 @@ Standalone exe included. See [src/bindings/CommandCam](https://github.com/chuckf
    *   saveShots: true,
    *   output: 'jpeg',
    *   device: '',
-   *   callbackReturn: 'location',
    *   verbose: false,
+   *   timeout: 0,
    *   frames: 1,
    *   greyScale: false,
    *   rotation: 0,

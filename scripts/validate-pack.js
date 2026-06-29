@@ -121,11 +121,12 @@ try {
   writeFileSync(
     join(consumerDirectory, 'index.ts'),
     [
-      "import { create, getMetricsReport, listWebcams, type NodeWebcamConfig, type WebcamMetricsReport } from '@anthonylzq/node-webcam'",
+      "import { capture, create, getMetricsReport, listWebcams, type NodeWebcamConfig, type WebcamMetricsReport } from '@anthonylzq/node-webcam'",
       "const options: Partial<NodeWebcamConfig> = { device: false, output: 'jpg', timeout: 1 }",
-      "const webcam = create(options, 'linux')",
+      'const webcam = create(options)',
       'void webcam.listWebcams()',
-      "void listWebcams('linux')",
+      'void listWebcams()',
+      'void capture({ location: "photo.jpg", options }).then(result => result.buffer)',
       'const report: WebcamMetricsReport = getMetricsReport()',
       'const total: number = report.captures.total',
       'void total'
@@ -135,11 +136,12 @@ try {
   writeFileSync(
     join(consumerDirectory, 'index.mts'),
     [
-      "import { create, getMetricsReport, listWebcams, type NodeWebcamConfig, type WebcamMetricsReport } from '@anthonylzq/node-webcam'",
+      "import { capture, create, getMetricsReport, listWebcams, type NodeWebcamConfig, type WebcamMetricsReport } from '@anthonylzq/node-webcam'",
       "const options: Partial<NodeWebcamConfig> = { device: false, output: 'jpg', timeout: 1 }",
-      "const webcam = create(options, 'linux')",
+      'const webcam = create(options)',
       'void webcam.listWebcams()',
-      "void listWebcams('linux')",
+      'void listWebcams()',
+      'void capture({ location: "photo.jpg", options }).then(result => result.toBase64())',
       'const report: WebcamMetricsReport = getMetricsReport()',
       'const total: number = report.captures.total',
       'void total'

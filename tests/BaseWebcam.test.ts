@@ -54,6 +54,13 @@ const waitForeverScript = 'setTimeout(() => {}, 1000)'
 class Base64CountingWebcam extends BaseWebcam {
   base64Calls = 0
 
+  generateCommand(location: string) {
+    return {
+      file: process.execPath,
+      args: ['-e', writeFixtureImageScript, location]
+    }
+  }
+
   getBase64FromBuffer(shotBuffer: Buffer) {
     this.base64Calls += 1
 
@@ -75,9 +82,11 @@ class FakeCaptureWebcam extends BaseWebcam {
     FakeCaptureWebcam.maxActiveCaptures = 0
   }
 
-  protected async executeCommand(command: WebcamCommand | string) {
-    if (typeof command === 'string') throw new Error('Unexpected shell command')
+  generateCommand(location: string) {
+    return { file: 'fake', args: [location] }
+  }
 
+  protected async executeCommand(command: WebcamCommand) {
     this.calls += 1
     const call = this.calls
     this.activeCaptures += 1
@@ -105,6 +114,31 @@ class FakeCaptureWebcam extends BaseWebcam {
   }
 }
 
+class CommandWebcam extends BaseWebcam {
+  #command: WebcamCommand
+
+  constructor(
+    options: ConstructorParameters<typeof BaseWebcam>[0],
+    command: WebcamCommand
+  ) {
+    super(options)
+    this.#command = command
+  }
+
+  generateCommand() {
+    return this.#command
+  }
+}
+
+const createWriteImageWebcam = (
+  location: string,
+  options?: ConstructorParameters<typeof BaseWebcam>[0]
+) =>
+  new CommandWebcam(options, {
+    file: process.execPath,
+    args: ['-e', writeFixtureImageScript, location]
+  })
+
 describe('BaseWebcam', () => {
   it('returns a defensive copy of options', () => {
     const webcam = new BaseWebcam({ width: 640 })
@@ -118,15 +152,11 @@ describe('BaseWebcam', () => {
   it('rejects paths without an extension before executing commands', async () => {
     const webcam = new BaseWebcam({})
 
-    await assert.rejects(
-      () =>
-        webcam.capture({ file: 'should-not-run', args: [] }, 'photo', 'buffer'),
-      {
-        code: 'INVALID_OUTPUT_PATH',
-        message: 'Invalid path, missing type file',
-        name: 'WebcamError'
-      }
-    )
+    await assert.rejects(() => webcam.capture({ location: 'photo' }), {
+      code: 'INVALID_OUTPUT_PATH',
+      message: 'Invalid path, missing type file',
+      name: 'WebcamError'
+    })
   })
 
   it('rejects output paths whose file name starts with a dash', async () => {
@@ -134,11 +164,9 @@ describe('BaseWebcam', () => {
 
     await assert.rejects(
       () =>
-        webcam.capture(
-          { file: 'should-not-run', args: [] },
-          '/tmp/--exec=echo injected.jpg',
-          'buffer'
-        ),
+        webcam.capture({
+          location: '/tmp/--exec=echo injected.jpg'
+        }),
       {
         code: 'INVALID_OUTPUT_PATH',
         message:
@@ -151,85 +179,45 @@ describe('BaseWebcam', () => {
   it('rejects unsupported file extensions before executing commands', async () => {
     const webcam = new BaseWebcam({})
 
-    await assert.rejects(
-      () =>
-        webcam.capture(
-          { file: 'should-not-run', args: [] },
-          'photo.gif',
-          'buffer'
-        ),
-      {
-        code: 'INVALID_FILE_EXTENSION',
-        message: 'Invalid file extension: gif',
-        name: 'WebcamError'
-      }
-    )
+    await assert.rejects(() => webcam.capture({ location: 'photo.gif' }), {
+      code: 'INVALID_FILE_EXTENSION',
+      message: 'Invalid file extension: gif',
+      name: 'WebcamError'
+    })
   })
 
   it('rejects mismatched output and file extension before execution', async () => {
     const webcam = new BaseWebcam({ output: 'jpeg' })
 
-    await assert.rejects(
-      () =>
-        webcam.capture(
-          { file: 'should-not-run', args: [] },
-          'photo.png',
-          'buffer'
-        ),
-      {
-        code: 'OUTPUT_MISMATCH',
-        message: 'The output (jpeg) and the file type (png) does not match',
-        name: 'WebcamError'
-      }
-    )
-  })
-
-  it('rejects invalid return types before executing commands', async () => {
-    const webcam = new BaseWebcam({ output: 'png' })
-
-    await assert.rejects(
-      () =>
-        webcam.capture(
-          { file: 'should-not-run', args: [] },
-          'photo.png',
-          'json' as 'buffer'
-        ),
-      {
-        code: 'INVALID_RETURN_TYPE',
-        message: 'Invalid returnType: json',
-        name: 'WebcamError'
-      }
-    )
+    await assert.rejects(() => webcam.capture({ location: 'photo.png' }), {
+      code: 'OUTPUT_MISMATCH',
+      message: 'The output (jpeg) and the file type (png) does not match',
+      name: 'WebcamError'
+    })
   })
 
   it('wraps missing command binaries with a typed error', async () => {
-    const webcam = new BaseWebcam({ output: 'png' })
-
-    await assert.rejects(
-      () =>
-        webcam.capture(
-          { file: 'definitely-not-node-webcam-command', args: [] },
-          'photo.png',
-          'buffer'
-        ),
-      {
-        code: 'BINARY_NOT_FOUND',
-        message:
-          'Webcam command binary was not found: definitely-not-node-webcam-command',
-        name: 'WebcamError'
-      }
+    const webcam = new CommandWebcam(
+      { output: 'png' },
+      { file: 'definitely-not-node-webcam-command', args: [] }
     )
+
+    await assert.rejects(() => webcam.capture({ location: 'photo.png' }), {
+      code: 'BINARY_NOT_FOUND',
+      message:
+        'Webcam command binary was not found: definitely-not-node-webcam-command',
+      name: 'WebcamError'
+    })
   })
 
   it('wraps failed commands with command details', async () => {
-    const webcam = new BaseWebcam({ output: 'png' })
+    const webcam = new CommandWebcam(
+      { output: 'png' },
+      { file: process.execPath, args: ['-e', 'process.exit(7)'] }
+    )
 
     try {
-      await webcam.capture(
-        { file: process.execPath, args: ['-e', 'process.exit(7)'] },
-        'photo.png',
-        'buffer'
-      )
+      await webcam.capture({ location: 'photo.png' })
       assert.fail('Expected command failure')
     } catch (error) {
       assert.ok(error instanceof WebcamError)
@@ -240,14 +228,13 @@ describe('BaseWebcam', () => {
   })
 
   it('wraps timed out capture commands with a typed error', async () => {
-    const webcam = new BaseWebcam({ output: 'png', timeout: 10 })
+    const webcam = new CommandWebcam(
+      { output: 'png', timeout: 10 },
+      { file: process.execPath, args: ['-e', waitForeverScript] }
+    )
 
     try {
-      await webcam.capture(
-        { file: process.execPath, args: ['-e', waitForeverScript] },
-        'photo.png',
-        'buffer'
-      )
+      await webcam.capture({ location: 'photo.png' })
       assert.fail('Expected timeout failure')
     } catch (error) {
       assert.ok(error instanceof WebcamError)
@@ -263,18 +250,17 @@ describe('BaseWebcam', () => {
 
   it('wraps aborted capture commands with a typed error', async () => {
     const controller = new AbortController()
-    const webcam = new BaseWebcam({
-      output: 'png',
-      signal: controller.signal
-    })
+    const webcam = new CommandWebcam(
+      {
+        output: 'png',
+        signal: controller.signal
+      },
+      { file: process.execPath, args: ['-e', waitForeverScript] }
+    )
     const timer = setTimeout(() => controller.abort(), 10)
 
     try {
-      await webcam.capture(
-        { file: process.execPath, args: ['-e', waitForeverScript] },
-        'photo.png',
-        'buffer'
-      )
+      await webcam.capture({ location: 'photo.png' })
       assert.fail('Expected abort failure')
     } catch (error) {
       assert.ok(error instanceof WebcamError)
@@ -293,40 +279,27 @@ describe('BaseWebcam', () => {
   it('rejects invalid capture timeouts before executing commands', async () => {
     const webcam = new BaseWebcam({ output: 'png', timeout: -1 })
 
-    await assert.rejects(
-      () =>
-        webcam.capture(
-          { file: 'should-not-run', args: [] },
-          'photo.png',
-          'buffer'
-        ),
-      {
-        code: 'INVALID_TIMEOUT',
-        message: 'Invalid timeout: -1',
-        name: 'WebcamError'
-      }
-    )
+    await assert.rejects(() => webcam.capture({ location: 'photo.png' }), {
+      code: 'INVALID_TIMEOUT',
+      message: 'Invalid timeout: -1',
+      name: 'WebcamError'
+    })
   })
 
   it('wraps missing capture output with a typed error', async () => {
     const directory = mkdtempSync(join(tmpdir(), 'node-webcam-'))
     const path = join(directory, 'photo.png')
-    const webcam = new BaseWebcam({ output: 'png' })
+    const webcam = new CommandWebcam(
+      { output: 'png' },
+      { file: process.execPath, args: ['-e', 'process.exit(0)'] }
+    )
 
     try {
-      await assert.rejects(
-        () =>
-          webcam.capture(
-            { file: process.execPath, args: ['-e', 'process.exit(0)'] },
-            path,
-            'buffer'
-          ),
-        {
-          code: 'OUTPUT_READ_FAILED',
-          message: `Unable to read captured output: ${path}`,
-          name: 'WebcamError'
-        }
-      )
+      await assert.rejects(() => webcam.capture({ location: path }), {
+        code: 'OUTPUT_READ_FAILED',
+        message: `Unable to read captured output: ${path}`,
+        name: 'WebcamError'
+      })
     } finally {
       rmSync(directory, { recursive: true, force: true })
     }
@@ -335,19 +308,14 @@ describe('BaseWebcam', () => {
   it('executes capture commands without a shell', async () => {
     const directory = mkdtempSync(join(tmpdir(), 'node-webcam-'))
     const path = join(directory, 'photo.png')
-    const webcam = new BaseWebcam({ output: 'png' })
+    const webcam = createWriteImageWebcam(path, { output: 'png' })
 
     try {
-      const result = await webcam.capture(
-        {
-          file: process.execPath,
-          args: ['-e', writeFixtureImageScript, path]
-        },
-        path,
-        'buffer'
-      )
+      const result = await webcam.capture({
+        location: path
+      })
 
-      assert.deepEqual([...(result as Buffer)], [1, 2, 3])
+      assert.deepEqual([...result.buffer], [1, 2, 3])
     } finally {
       rmSync(directory, { recursive: true, force: true })
     }
@@ -356,17 +324,10 @@ describe('BaseWebcam', () => {
   it('saves captured shots in memory by default', async () => {
     const directory = mkdtempSync(join(tmpdir(), 'node-webcam-'))
     const path = join(directory, 'photo.png')
-    const webcam = new BaseWebcam({ output: 'png' })
+    const webcam = createWriteImageWebcam(path, { output: 'png' })
 
     try {
-      await webcam.capture(
-        {
-          file: process.execPath,
-          args: ['-e', writeFixtureImageScript, path]
-        },
-        path,
-        'buffer'
-      )
+      await webcam.capture({ location: path })
 
       const shot = webcam.getLastShot()
 
@@ -383,17 +344,13 @@ describe('BaseWebcam', () => {
   it('does not retain captured buffers when saveShots is false', async () => {
     const directory = mkdtempSync(join(tmpdir(), 'node-webcam-'))
     const path = join(directory, 'photo.png')
-    const webcam = new BaseWebcam({ output: 'png', saveShots: false })
+    const webcam = createWriteImageWebcam(path, {
+      output: 'png',
+      saveShots: false
+    })
 
     try {
-      await webcam.capture(
-        {
-          file: process.execPath,
-          args: ['-e', writeFixtureImageScript, path]
-        },
-        path,
-        'buffer'
-      )
+      await webcam.capture({ location: path })
 
       assert.throws(() => webcam.getLastShot(), {
         code: 'SHOT_NOT_FOUND',
@@ -420,8 +377,8 @@ describe('BaseWebcam', () => {
 
     try {
       await Promise.all([
-        webcam.capture({ file: 'fake', args: [path] }, path, 'buffer'),
-        webcam.capture({ file: 'fake', args: [path] }, path, 'buffer')
+        webcam.capture({ location: path }),
+        webcam.capture({ location: path })
       ])
 
       assert.equal(webcam.maxActiveCaptures, 1)
@@ -449,16 +406,8 @@ describe('BaseWebcam', () => {
 
     try {
       await Promise.all([
-        firstWebcam.capture(
-          { file: 'fake', args: [relativePath] },
-          relativePath,
-          'buffer'
-        ),
-        secondWebcam.capture(
-          { file: 'fake', args: [absolutePath] },
-          absolutePath,
-          'buffer'
-        )
+        firstWebcam.capture({ location: relativePath }),
+        secondWebcam.capture({ location: absolutePath })
       ])
 
       assert.equal(FakeCaptureWebcam.maxActiveCaptures, 1)
@@ -479,16 +428,8 @@ describe('BaseWebcam', () => {
 
     try {
       await Promise.all([
-        webcam.capture(
-          { file: 'fake', args: [firstPath] },
-          firstPath,
-          'buffer'
-        ),
-        webcam.capture(
-          { file: 'fake', args: [secondPath] },
-          secondPath,
-          'buffer'
-        )
+        webcam.capture({ location: firstPath }),
+        webcam.capture({ location: secondPath })
       ])
 
       assert.equal(webcam.maxActiveCaptures, 1)
@@ -508,16 +449,8 @@ describe('BaseWebcam', () => {
 
     try {
       await Promise.all([
-        webcam.capture(
-          { file: 'fake', args: [firstPath] },
-          firstPath,
-          'buffer'
-        ),
-        webcam.capture(
-          { file: 'fake', args: [secondPath] },
-          secondPath,
-          'buffer'
-        )
+        webcam.capture({ location: firstPath }),
+        webcam.capture({ location: secondPath })
       ])
 
       assert.equal(webcam.maxActiveCaptures, 1)
@@ -545,16 +478,8 @@ describe('BaseWebcam', () => {
 
     try {
       await Promise.all([
-        firstWebcam.capture(
-          { file: 'fake', args: [firstPath] },
-          firstPath,
-          'buffer'
-        ),
-        secondWebcam.capture(
-          { file: 'fake', args: [secondPath] },
-          secondPath,
-          'buffer'
-        )
+        firstWebcam.capture({ location: firstPath }),
+        secondWebcam.capture({ location: secondPath })
       ])
 
       assert.equal(FakeCaptureWebcam.maxActiveCaptures, 2)
@@ -573,22 +498,14 @@ describe('BaseWebcam', () => {
     webcam.failFirstCapture = true
 
     try {
-      const first = webcam.capture(
-        { file: 'fake', args: [path] },
-        path,
-        'buffer'
-      )
-      const second = webcam.capture(
-        { file: 'fake', args: [path] },
-        path,
-        'buffer'
-      )
+      const first = webcam.capture({ location: path })
+      const second = webcam.capture({ location: path })
 
       await assert.rejects(() => first, {
         code: 'COMMAND_FAILED',
         name: 'WebcamError'
       })
-      assert.deepEqual([...((await second) as Buffer)], [2])
+      assert.deepEqual([...(await second).buffer], [2])
       assert.equal(webcam.maxActiveCaptures, 1)
     } finally {
       rmSync(directory, { recursive: true, force: true })
@@ -598,17 +515,10 @@ describe('BaseWebcam', () => {
   it('clears retained shots', async () => {
     const directory = mkdtempSync(join(tmpdir(), 'node-webcam-'))
     const path = join(directory, 'photo.png')
-    const webcam = new BaseWebcam({ output: 'png' })
+    const webcam = createWriteImageWebcam(path, { output: 'png' })
 
     try {
-      await webcam.capture(
-        {
-          file: process.execPath,
-          args: ['-e', writeFixtureImageScript, path]
-        },
-        path,
-        'buffer'
-      )
+      await webcam.capture({ location: path })
 
       webcam.clear()
 
@@ -622,20 +532,13 @@ describe('BaseWebcam', () => {
     }
   })
 
-  it('does not build base64 output when returning buffers', async () => {
+  it('does not build base64 output unless requested', async () => {
     const directory = mkdtempSync(join(tmpdir(), 'node-webcam-'))
     const path = join(directory, 'photo.png')
     const webcam = new Base64CountingWebcam({ output: 'png' })
 
     try {
-      await webcam.capture(
-        {
-          file: process.execPath,
-          args: ['-e', writeFixtureImageScript, path]
-        },
-        path,
-        'buffer'
-      )
+      await webcam.capture({ location: path })
 
       assert.equal(webcam.base64Calls, 0)
     } finally {
@@ -643,23 +546,41 @@ describe('BaseWebcam', () => {
     }
   })
 
-  it('only builds base64 output when requested', async () => {
+  it('builds base64 output lazily when requested', async () => {
     const directory = mkdtempSync(join(tmpdir(), 'node-webcam-'))
     const path = join(directory, 'photo.png')
     const webcam = new Base64CountingWebcam({ output: 'png' })
 
     try {
-      const result = await webcam.capture(
-        {
-          file: process.execPath,
-          args: ['-e', writeFixtureImageScript, path]
-        },
-        path,
-        'base64'
-      )
+      const result = await webcam.capture({
+        location: path
+      })
 
+      assert.equal(webcam.base64Calls, 0)
+      assert.equal(result.toBase64(), 'data:image/png;base64,AQID')
       assert.equal(webcam.base64Calls, 1)
-      assert.equal(result, 'data:image/png;base64,AQID')
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
+  })
+
+  it('returns structured capture results', async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'node-webcam-'))
+    const path = join(directory, 'photo.png')
+    const webcam = createWriteImageWebcam(path, { output: 'png' })
+
+    try {
+      const result = await webcam.capture({
+        location: path
+      })
+
+      assert.equal(result.backend, 'CommandWebcam')
+      assert.equal(result.bytes, 3)
+      assert.deepEqual([...result.buffer], [1, 2, 3])
+      assert.equal(result.location, path)
+      assert.equal(result.mimeType, 'image/png')
+      assert.equal(typeof result.elapsedMs, 'number')
+      assert.equal(typeof result.queueWaitMs, 'number')
     } finally {
       rmSync(directory, { recursive: true, force: true })
     }
@@ -668,18 +589,11 @@ describe('BaseWebcam', () => {
   it('stays silent by default during successful captures', async () => {
     const directory = mkdtempSync(join(tmpdir(), 'node-webcam-'))
     const path = join(directory, 'photo.png')
-    const webcam = new BaseWebcam({ output: 'png' })
+    const webcam = createWriteImageWebcam(path, { output: 'png' })
 
     try {
       const calls = await captureConsoleOutput(async () => {
-        await webcam.capture(
-          {
-            file: process.execPath,
-            args: ['-e', writeFixtureImageScript, path]
-          },
-          path,
-          'buffer'
-        )
+        await webcam.capture({ location: path })
       })
 
       assert.equal(calls.length, 0)
@@ -691,18 +605,14 @@ describe('BaseWebcam', () => {
   it('emits verbose capture diagnostics for successful captures', async () => {
     const directory = mkdtempSync(join(tmpdir(), 'node-webcam-'))
     const path = join(directory, 'photo.png')
-    const webcam = new BaseWebcam({ output: 'png', verbose: true })
+    const webcam = createWriteImageWebcam(path, {
+      output: 'png',
+      verbose: true
+    })
 
     try {
       const calls = await captureConsoleOutput(async () => {
-        await webcam.capture(
-          {
-            file: process.execPath,
-            args: ['-e', writeFixtureImageScript, path]
-          },
-          path,
-          'buffer'
-        )
+        await webcam.capture({ location: path })
       })
 
       assert.equal(calls.length, 2)
@@ -720,11 +630,10 @@ describe('BaseWebcam', () => {
       const startDetails = calls[0].args[2] as Record<string, unknown>
       const successDetails = calls[1].args[2] as Record<string, unknown>
 
-      assert.equal(startDetails.backend, 'BaseWebcam')
+      assert.equal(startDetails.backend, 'CommandWebcam')
       assert.equal(startDetails.file, process.execPath)
       assert.deepEqual(startDetails.args, ['-e', writeFixtureImageScript, path])
       assert.equal(startDetails.path, path)
-      assert.equal(startDetails.returnType, 'buffer')
       assert.match(String(startDetails.operationId), /^capture-\d+$/)
       assert.equal(successDetails.operationId, startDetails.operationId)
       assert.equal(successDetails.bytes, 3)
@@ -735,18 +644,15 @@ describe('BaseWebcam', () => {
   })
 
   it('emits verbose capture diagnostics for command failures', async () => {
-    const webcam = new BaseWebcam({ output: 'png', verbose: true })
+    const webcam = new CommandWebcam(
+      { output: 'png', verbose: true },
+      { file: 'definitely-not-node-webcam-command', args: [] }
+    )
 
     const calls = await captureConsoleOutput(async () => {
-      await assert.rejects(
-        () =>
-          webcam.capture(
-            { file: 'definitely-not-node-webcam-command', args: [] },
-            'photo.png',
-            'buffer'
-          ),
-        { code: 'BINARY_NOT_FOUND' }
-      )
+      await assert.rejects(() => webcam.capture({ location: 'photo.png' }), {
+        code: 'BINARY_NOT_FOUND'
+      })
     })
 
     assert.equal(calls.length, 2)
@@ -774,7 +680,10 @@ describe('BaseWebcam', () => {
   it('routes verbose diagnostics through the logger abstraction', async () => {
     const directory = mkdtempSync(join(tmpdir(), 'node-webcam-'))
     const path = join(directory, 'photo.png')
-    const webcam = new BaseWebcam({ output: 'png', verbose: true })
+    const webcam = createWriteImageWebcam(path, {
+      output: 'png',
+      verbose: true
+    })
     const entries: WebcamLogEntry[] = []
 
     setLogger({
@@ -784,14 +693,7 @@ describe('BaseWebcam', () => {
     })
 
     try {
-      await webcam.capture(
-        {
-          file: process.execPath,
-          args: ['-e', writeFixtureImageScript, path]
-        },
-        path,
-        'buffer'
-      )
+      await webcam.capture({ location: path })
     } finally {
       resetLogger()
       rmSync(directory, { recursive: true, force: true })
@@ -804,7 +706,7 @@ describe('BaseWebcam', () => {
         ['info', 'capture:success']
       ]
     )
-    assert.equal(entries[0].details.backend, 'BaseWebcam')
+    assert.equal(entries[0].details.backend, 'CommandWebcam')
   })
 
   it('throws a typed error for missing shot indexes', () => {

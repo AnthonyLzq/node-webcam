@@ -8,7 +8,6 @@ type WebcamCaptureMetric = {
   code?: WebcamErrorCode
   elapsedMs: number
   queueWaitMs: number
-  returnType: 'base64' | 'buffer'
   status: WebcamCaptureStatus
 }
 

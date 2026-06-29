@@ -5,7 +5,6 @@ import { join } from 'node:path'
 import { describe, it } from 'node:test'
 
 import { list, listWebcams } from '../src'
-import { WebcamError } from '../src/errors'
 import {
   getCameras,
   getImageSnapListCommand,
@@ -113,30 +112,14 @@ describe('camera listing', () => {
   })
 
   it('exposes top-level list as a deprecated async listing API', async () => {
-    const cameras = await list('linux')
+    const cameras = await list()
 
     assert.ok(Array.isArray(cameras))
   })
 
   it('exposes top-level listWebcams as the async listing API', async () => {
-    const cameras = await listWebcams('linux')
+    const cameras = await listWebcams()
 
     assert.ok(Array.isArray(cameras))
-  })
-
-  it('preserves typed errors from top-level list factory validation', async () => {
-    await assert.rejects(() => list('unsupported'), {
-      code: 'UNSUPPORTED_WEBCAM_TYPE',
-      name: 'WebcamError'
-    })
-
-    await assert.rejects(() => listWebcams('unsupported'), {
-      code: 'UNSUPPORTED_WEBCAM_TYPE',
-      name: 'WebcamError'
-    })
-
-    await listWebcams('unsupported').catch(error => {
-      assert.ok(error instanceof WebcamError)
-    })
   })
 })

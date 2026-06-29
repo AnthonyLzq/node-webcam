@@ -1,66 +1,76 @@
-/* eslint-disable @typescript-eslint/no-unused-vars, @typescript-eslint/no-empty-function */
-import { resolve } from 'path'
+import os from 'os'
 
-import { Factory } from './Factory'
+import { WebcamError } from './errors'
 import { BaseWebcam, FSWebcam, ImageSnapWebcam, WindowsWebcam } from './webcams'
+import { getPlatformCameras } from './utils'
+import type { WebcamCaptureResult } from './webcams/BaseWebcam'
 import type { WebcamConfig } from './types'
 
-const create = (options: Partial<WebcamConfig>, type: string) =>
-  new Factory(options).create(type)
+type CaptureRequest = {
+  location?: string
+  options?: Partial<WebcamConfig>
+  cb?: (value: WebcamCaptureResult) => void
+}
 
-const capture = async (
-  {
-    location = 'location.jpeg',
-    type = 'linux',
-    options = {},
-    cb = (value?: string | Buffer) => {},
-    returnType = 'base64'
-  }: {
-    location?: string
-    type?: string
-    options?: Partial<WebcamConfig>
-    cb?: (value?: string | Buffer) => void
-    returnType?: 'base64' | 'buffer'
-  } = {
-    location: 'location.jpeg',
-    type: 'linux',
-    options: {},
-    cb: (value?: string | Buffer) => {},
-    returnType: 'base64'
+const supportedPlatforms = ['linux', 'darwin', 'win32']
+
+const create = (options: Partial<WebcamConfig> = {}) => {
+  const currentPlatform = os.platform()
+
+  switch (currentPlatform) {
+    case 'linux':
+      return new FSWebcam(options)
+    case 'darwin':
+      return new ImageSnapWebcam(options)
+    case 'win32':
+      return new WindowsWebcam(options)
+    default:
+      throw new WebcamError({
+        code: 'UNSUPPORTED_WEBCAM_TYPE',
+        message: 'Webcam type is not supported',
+        details: {
+          requestedType: currentPlatform,
+          supportedTypes: supportedPlatforms
+        }
+      })
   }
-) => {
-  const Webcam = create(options, type)
-  const path = resolve(__dirname, location)
-  const result = await Webcam.capture(
-    Webcam.generateCommand(location),
-    path,
-    returnType
-  )
+}
 
-  cb?.(result)
+const capture = async ({
+  location = 'location.jpeg',
+  options = {},
+  cb
+}: CaptureRequest = {}) => {
+  const Webcam = create(options)
+  const result = await Webcam.capture({ location })
+
+  if (cb) cb(result)
 
   return result
 }
 
-const list = async (type: string) => create({}, type).list()
+const list = async () => getPlatformCameras()
 
-const listWebcams = async (type: string) => create({}, type).listWebcams()
+const listWebcams = async () => getPlatformCameras()
 
 export {
   create,
   capture,
   list,
   listWebcams,
-  Factory,
   BaseWebcam,
   FSWebcam,
   ImageSnapWebcam,
   WindowsWebcam
 }
 export { defaults } from './utils'
-export { WebcamError } from './errors'
+export { WebcamError }
 export { getMetricsReport, resetMetrics } from './metrics'
 
 export type NodeWebcamConfig = WebcamConfig
 export type { WebcamErrorCode } from './errors'
 export type { WebcamCaptureMetrics, WebcamMetricsReport } from './metrics'
+export type {
+  WebcamCaptureOptions,
+  WebcamCaptureResult
+} from './webcams/BaseWebcam'

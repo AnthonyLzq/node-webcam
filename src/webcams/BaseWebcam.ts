@@ -24,7 +24,20 @@ export type WebcamCommand = {
   args: string[]
 }
 
-type CaptureReturnType = 'buffer' | 'base64'
+export type WebcamCaptureOptions = {
+  location: string
+}
+
+export type WebcamCaptureResult = {
+  backend: string
+  buffer: Buffer
+  bytes: number
+  elapsedMs: number
+  location: string
+  mimeType: string
+  queueWaitMs: number
+  toBase64: () => string
+}
 
 const runQueueKey = async <T>(key: string, task: () => Promise<T>) => {
   const previous = captureQueues.get(key) ?? Promise.resolve()
@@ -123,6 +136,14 @@ class BaseWebcam {
     return `${bin} ${devSwitch} --list-controls`
   }
 
+  generateCommand(_location: string): WebcamCommand {
+    throw new WebcamError({
+      code: 'COMMAND_FAILED',
+      message: 'Capture command generation is not implemented',
+      details: { location: _location }
+    })
+  }
+
   createShot(location: string, data: Buffer) {
     return new Shot(location, data)
   }
@@ -190,11 +211,10 @@ class BaseWebcam {
     })
   }
 
-  async capture(
-    command: WebcamCommand,
-    path: string,
-    returnType: CaptureReturnType
-  ) {
+  async capture({
+    location
+  }: WebcamCaptureOptions): Promise<WebcamCaptureResult> {
+    const path = resolve(location)
     const match = path.match(r)
 
     if (!match)
@@ -237,16 +257,6 @@ class BaseWebcam {
         }
       })
 
-    if (!['buffer', 'base64'].includes(returnType))
-      throw new WebcamError({
-        code: 'INVALID_RETURN_TYPE',
-        message: `Invalid returnType: ${returnType}`,
-        details: {
-          allowedReturnTypes: ['buffer', 'base64'],
-          returnType
-        }
-      })
-
     if (!Number.isFinite(this.#options.timeout) || this.#options.timeout < 0)
       throw new WebcamError({
         code: 'INVALID_TIMEOUT',
@@ -259,14 +269,13 @@ class BaseWebcam {
     const queuedAt = Date.now()
 
     return runQueued(this.getCaptureQueueKeys(path), async () =>
-      this.runCapture(command, path, returnType, Date.now() - queuedAt)
+      this.runCapture(this.generateCommand(path), path, Date.now() - queuedAt)
     )
   }
 
   private async runCapture(
     command: WebcamCommand,
     path: string,
-    returnType: CaptureReturnType,
     queueWaitMs: number
   ) {
     const operationId = this.createDiagnosticId('capture')
@@ -278,7 +287,6 @@ class BaseWebcam {
       operationId,
       path,
       queueWaitMs,
-      returnType,
       timeout: this.#options.timeout
     }
 
@@ -305,7 +313,6 @@ class BaseWebcam {
           file: command.file,
           operationId,
           path,
-          returnType,
           signalAborted: this.#options.signal?.aborted ?? false,
           timeout: this.#options.timeout
         }
@@ -317,7 +324,6 @@ class BaseWebcam {
         code,
         elapsedMs,
         queueWaitMs,
-        returnType,
         status: 'failed'
       })
 
@@ -347,8 +353,7 @@ class BaseWebcam {
         details: {
           elapsedMs,
           operationId,
-          path,
-          returnType
+          path
         }
       })
 
@@ -358,7 +363,6 @@ class BaseWebcam {
         code: 'OUTPUT_READ_FAILED',
         elapsedMs,
         queueWaitMs,
-        returnType,
         status: 'failed'
       })
 
@@ -384,7 +388,6 @@ class BaseWebcam {
       bytes: buffer.length,
       elapsedMs,
       queueWaitMs,
-      returnType,
       status: 'succeeded'
     })
 
@@ -398,9 +401,16 @@ class BaseWebcam {
       'info'
     )
 
-    if (returnType === 'buffer') return buffer
-
-    return this.getBase64FromBuffer(buffer)
+    return {
+      backend: this.getBackendName(),
+      buffer,
+      bytes: buffer.length,
+      elapsedMs,
+      location: path,
+      mimeType: `image/${this.#options.output}`,
+      queueWaitMs,
+      toBase64: () => this.getBase64FromBuffer(buffer)
+    }
   }
 
   getShot(index: number): Shot {

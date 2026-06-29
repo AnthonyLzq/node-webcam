@@ -17,6 +17,10 @@ class StressWebcam extends BaseWebcam {
   calls = 0
   maxActiveCaptures = 0
 
+  generateCommand(location: string) {
+    return { file: 'fake', args: [location] }
+  }
+
   getBase64FromBuffer(shotBuffer: Buffer) {
     this.base64Calls += 1
 
@@ -40,6 +44,22 @@ class StressWebcam extends BaseWebcam {
   }
 }
 
+class CommandWebcam extends BaseWebcam {
+  #command: WebcamCommand
+
+  constructor(
+    options: ConstructorParameters<typeof BaseWebcam>[0],
+    command: WebcamCommand
+  ) {
+    super(options)
+    this.#command = command
+  }
+
+  generateCommand() {
+    return this.#command
+  }
+}
+
 describe('performance regressions', () => {
   it('serializes repeated concurrent captures to the same path', async () => {
     const directory = mkdtempSync(join(tmpdir(), 'node-webcam-'))
@@ -48,9 +68,7 @@ describe('performance regressions', () => {
 
     try {
       await Promise.all(
-        Array.from({ length: 5 }, () =>
-          webcam.capture({ file: 'fake', args: [path] }, path, 'buffer')
-        )
+        Array.from({ length: 5 }, () => webcam.capture({ location: path }))
       )
 
       assert.equal(webcam.calls, 5)
@@ -63,26 +81,28 @@ describe('performance regressions', () => {
   it('releases path queues after timeout failures', async () => {
     const directory = mkdtempSync(join(tmpdir(), 'node-webcam-'))
     const path = join(directory, 'photo.png')
-    const timeoutWebcam = new BaseWebcam({ output: 'png', timeout: 10 })
-    const successWebcam = new BaseWebcam({ output: 'png', saveShots: false })
+    const timeoutWebcam = new CommandWebcam(
+      { output: 'png', timeout: 10 },
+      { file: process.execPath, args: ['-e', waitForeverScript] }
+    )
+    const successWebcam = new CommandWebcam(
+      { output: 'png', saveShots: false },
+      { file: process.execPath, args: ['-e', writeFixtureImageScript, path] }
+    )
 
     try {
-      const firstCapture = timeoutWebcam.capture(
-        { file: process.execPath, args: ['-e', waitForeverScript] },
-        path,
-        'buffer'
-      )
-      const secondCapture = successWebcam.capture(
-        { file: process.execPath, args: ['-e', writeFixtureImageScript, path] },
-        path,
-        'buffer'
-      )
+      const firstCapture = timeoutWebcam.capture({
+        location: path
+      })
+      const secondCapture = successWebcam.capture({
+        location: path
+      })
 
       await assert.rejects(() => firstCapture, {
         code: 'COMMAND_TIMEOUT',
         name: 'WebcamError'
       })
-      assert.deepEqual([...((await secondCapture) as Buffer)], [1, 2, 3])
+      assert.deepEqual([...(await secondCapture).buffer], [1, 2, 3])
     } finally {
       rmSync(directory, { recursive: true, force: true })
     }
@@ -96,7 +116,7 @@ describe('performance regressions', () => {
       for (let index = 0; index < 3; index += 1) {
         const path = join(directory, `${index}.png`)
 
-        await webcam.capture({ file: 'fake', args: [path] }, path, 'buffer')
+        await webcam.capture({ location: path })
       }
 
       assert.equal(webcam.base64Calls, 0)
