@@ -4,7 +4,7 @@ import { join, resolve } from 'path'
 import { platform, tmpdir } from 'os'
 import ws from 'ws'
 
-import { capture } from '../../dist/'
+import { capture } from '@anthonylzq/node-webcam'
 
 const CAPTURE_INTERVAL_MS = 2500
 const CAPTURE_LOCATION = join(
