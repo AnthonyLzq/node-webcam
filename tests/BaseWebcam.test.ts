@@ -129,6 +129,25 @@ describe('BaseWebcam', () => {
     )
   })
 
+  it('rejects output paths whose file name starts with a dash', async () => {
+    const webcam = new BaseWebcam({ output: 'jpg' })
+
+    await assert.rejects(
+      () =>
+        webcam.capture(
+          { file: 'should-not-run', args: [] },
+          '/tmp/--exec=echo injected.jpg',
+          'buffer'
+        ),
+      {
+        code: 'INVALID_OUTPUT_PATH',
+        message:
+          'Invalid output path, file name must not start with "-": --exec=echo injected.jpg',
+        name: 'WebcamError'
+      }
+    )
+  })
+
   it('rejects unsupported file extensions before executing commands', async () => {
     const webcam = new BaseWebcam({})
 

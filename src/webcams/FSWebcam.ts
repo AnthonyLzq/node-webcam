@@ -15,6 +15,8 @@ class FSWebcam extends BaseWebcam {
    * @deprecated Use `generateCommand()` for safe argument-based execution.
    */
   generateSh(location: string): string {
+    this.validateOutputPath(location)
+
     const options = super.options
     const resolution = ` -r ${options.width}x${options.height}`
     const frames = `-F ${options.frames}`
@@ -47,6 +49,8 @@ class FSWebcam extends BaseWebcam {
   }
 
   generateCommand(location: string): WebcamCommand {
+    this.validateOutputPath(location)
+
     const options = super.options
     const args = [
       ...(options.verbose ? [] : ['-q']),

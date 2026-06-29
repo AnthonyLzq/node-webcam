@@ -16,6 +16,8 @@ class ImageSnapWebcam extends BaseWebcam {
    * @deprecated Use `generateCommand()` for safe argument-based execution.
    */
   generateSh(location: string): string {
+    this.validateOutputPath(location)
+
     const { options } = this
     const verbose = options.verbose ? '-v' : '-q'
     const delay = options.delay ? `-w ${options.delay}` : ''
@@ -28,6 +30,8 @@ class ImageSnapWebcam extends BaseWebcam {
   }
 
   generateCommand(location: string): WebcamCommand {
+    this.validateOutputPath(location)
+
     const { options } = this
     const args = []
 

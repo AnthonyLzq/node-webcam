@@ -174,4 +174,25 @@ describe('backend command generation', () => {
       'photo name.jpeg'
     ])
   })
+
+  it('rejects fswebcam output locations that look like options', () => {
+    const webcam = new FSWebcam({ output: 'jpg' })
+
+    assert.throws(
+      () => webcam.generateCommand('--exec=sh -c "echo injected" #.jpg'),
+      {
+        code: 'INVALID_OUTPUT_PATH',
+        message:
+          'Invalid output path, file name must not start with "-": --exec=sh -c "echo injected" #.jpg',
+        name: 'WebcamError'
+      }
+    )
+    assert.throws(
+      () => webcam.generateSh('--exec=sh -c "echo injected" #.jpg'),
+      {
+        code: 'INVALID_OUTPUT_PATH',
+        name: 'WebcamError'
+      }
+    )
+  })
 })

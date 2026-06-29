@@ -24,6 +24,8 @@ class WindowsWebcam extends BaseWebcam {
    * @deprecated Use `generateCommand()` for safe argument-based execution.
    */
   generateSh(location: string): string {
+    this.validateOutputPath(location)
+
     const { options } = this
     const device = options.device ? `/devnum ${options.device}` : ''
     const delay = options.delay ? `/delay ${options.delay}` : ''
@@ -35,6 +37,8 @@ class WindowsWebcam extends BaseWebcam {
   }
 
   generateCommand(location: string): WebcamCommand {
+    this.validateOutputPath(location)
+
     const { options } = this
     const args = []
 

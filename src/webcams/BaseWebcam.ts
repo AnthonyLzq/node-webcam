@@ -1,6 +1,6 @@
 import { execFile } from 'child_process'
 import { readFile } from 'fs/promises'
-import { resolve } from 'path'
+import { basename, resolve } from 'path'
 import { promisify } from 'util'
 
 import {
@@ -127,6 +127,17 @@ class BaseWebcam {
     return new Shot(location, data)
   }
 
+  protected validateOutputPath(path: string) {
+    const fileName = basename(path)
+
+    if (fileName.startsWith('-'))
+      throw new WebcamError({
+        code: 'INVALID_OUTPUT_PATH',
+        message: `Invalid output path, file name must not start with "-": ${fileName}`,
+        details: { fileName, path }
+      })
+  }
+
   protected createDiagnosticId(operation: string) {
     diagnosticCounter += 1
 
@@ -184,6 +195,8 @@ class BaseWebcam {
         message: 'Invalid path, missing type file',
         details: { path }
       })
+
+    this.validateOutputPath(path)
 
     if (!match[0])
       throw new WebcamError({
