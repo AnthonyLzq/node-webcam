@@ -183,7 +183,7 @@ describe('backend command generation', () => {
       {
         code: 'INVALID_OUTPUT_PATH',
         message:
-          'Invalid output path, file name must not start with "-": --exec=sh -c "echo injected" #.jpg',
+          'Invalid output path, path must not start with "-": --exec=sh -c "echo injected" #.jpg',
         name: 'WebcamError'
       }
     )
@@ -191,6 +191,15 @@ describe('backend command generation', () => {
       () => webcam.generateSh('--exec=sh -c "echo injected" #.jpg'),
       {
         code: 'INVALID_OUTPUT_PATH',
+        name: 'WebcamError'
+      }
+    )
+    assert.throws(
+      () => webcam.generateCommand('--exec=sh -c "echo injected" #/photo.jpg'),
+      {
+        code: 'INVALID_OUTPUT_PATH',
+        message:
+          'Invalid output path, path must not start with "-": --exec=sh -c "echo injected" #/photo.jpg',
         name: 'WebcamError'
       }
     )

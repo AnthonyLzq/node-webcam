@@ -128,7 +128,15 @@ class BaseWebcam {
   }
 
   protected validateOutputPath(path: string) {
+    const trimmedPath = path.trim()
     const fileName = basename(path)
+
+    if (trimmedPath.startsWith('-'))
+      throw new WebcamError({
+        code: 'INVALID_OUTPUT_PATH',
+        message: `Invalid output path, path must not start with "-": ${path}`,
+        details: { path }
+      })
 
     if (fileName.startsWith('-'))
       throw new WebcamError({
