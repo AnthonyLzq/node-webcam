@@ -65,7 +65,51 @@ describe('metrics', () => {
         totalElapsedMs: 0,
         totalQueueWaitMs: 0
       },
-      byBackend: {}
+      byBackend: {},
+      byBackendType: {
+        ffmpeg: {
+          aborted: 0,
+          averageElapsedMs: 0,
+          averageQueueWaitMs: 0,
+          bytesRead: 0,
+          failed: 0,
+          maxElapsedMs: 0,
+          maxQueueWaitMs: 0,
+          succeeded: 0,
+          timedOut: 0,
+          total: 0,
+          totalElapsedMs: 0,
+          totalQueueWaitMs: 0
+        },
+        legacy: {
+          aborted: 0,
+          averageElapsedMs: 0,
+          averageQueueWaitMs: 0,
+          bytesRead: 0,
+          failed: 0,
+          maxElapsedMs: 0,
+          maxQueueWaitMs: 0,
+          succeeded: 0,
+          timedOut: 0,
+          total: 0,
+          totalElapsedMs: 0,
+          totalQueueWaitMs: 0
+        },
+        native: {
+          aborted: 0,
+          averageElapsedMs: 0,
+          averageQueueWaitMs: 0,
+          bytesRead: 0,
+          failed: 0,
+          maxElapsedMs: 0,
+          maxQueueWaitMs: 0,
+          succeeded: 0,
+          timedOut: 0,
+          total: 0,
+          totalElapsedMs: 0,
+          totalQueueWaitMs: 0
+        }
+      }
     })
   })
 
@@ -87,6 +131,8 @@ describe('metrics', () => {
       assert.ok(report.captures.averageElapsedMs >= 0)
       assert.equal(report.byBackend.MetricsWebcam.total, 1)
       assert.equal(report.byBackend.MetricsWebcam.bytesRead, 4)
+      assert.equal(report.byBackendType.legacy.total, 1)
+      assert.equal(report.byBackendType.legacy.bytesRead, 4)
     } finally {
       rmSync(directory, { recursive: true, force: true })
     }

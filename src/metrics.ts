@@ -2,8 +2,11 @@ import type { WebcamErrorCode } from './errors'
 
 type WebcamCaptureStatus = 'failed' | 'succeeded'
 
+export type WebcamBackendType = 'ffmpeg' | 'legacy' | 'native'
+
 type WebcamCaptureMetric = {
   backend: string
+  backendType: WebcamBackendType
   bytes: number
   code?: WebcamErrorCode
   elapsedMs: number
@@ -29,6 +32,7 @@ export type WebcamCaptureMetrics = {
 export type WebcamMetricsReport = {
   captures: WebcamCaptureMetrics
   byBackend: Record<string, WebcamCaptureMetrics>
+  byBackendType: Record<WebcamBackendType, WebcamCaptureMetrics>
 }
 
 type WebcamMutableCaptureMetrics = Omit<
@@ -39,6 +43,7 @@ type WebcamMutableCaptureMetrics = Omit<
 type WebcamMutableMetrics = {
   captures: WebcamMutableCaptureMetrics
   byBackend: Record<string, WebcamMutableCaptureMetrics>
+  byBackendType: Record<WebcamBackendType, WebcamMutableCaptureMetrics>
 }
 
 const createCaptureMetrics = (): WebcamMutableCaptureMetrics => ({
@@ -56,7 +61,12 @@ const createCaptureMetrics = (): WebcamMutableCaptureMetrics => ({
 
 let metrics: WebcamMutableMetrics = {
   captures: createCaptureMetrics(),
-  byBackend: {}
+  byBackend: {},
+  byBackendType: {
+    ffmpeg: createCaptureMetrics(),
+    legacy: createCaptureMetrics(),
+    native: createCaptureMetrics()
+  }
 }
 
 const finalizeCaptureMetrics = (
@@ -104,6 +114,8 @@ const recordCaptureMetric = (metric: WebcamCaptureMetric) => {
     metrics.byBackend[metric.backend] ?? createCaptureMetrics()
 
   updateCaptureMetrics(metrics.byBackend[metric.backend], metric)
+
+  updateCaptureMetrics(metrics.byBackendType[metric.backendType], metric)
 }
 
 const getMetricsReport = (): WebcamMetricsReport => ({
@@ -113,13 +125,23 @@ const getMetricsReport = (): WebcamMetricsReport => ({
       backend,
       finalizeCaptureMetrics(backendMetrics)
     ])
-  )
+  ),
+  byBackendType: {
+    ffmpeg: finalizeCaptureMetrics(metrics.byBackendType.ffmpeg),
+    legacy: finalizeCaptureMetrics(metrics.byBackendType.legacy),
+    native: finalizeCaptureMetrics(metrics.byBackendType.native)
+  }
 })
 
 const resetMetrics = () => {
   metrics = {
     captures: createCaptureMetrics(),
-    byBackend: {}
+    byBackend: {},
+    byBackendType: {
+      ffmpeg: createCaptureMetrics(),
+      legacy: createCaptureMetrics(),
+      native: createCaptureMetrics()
+    }
   }
 }
 

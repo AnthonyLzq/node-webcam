@@ -1,13 +1,17 @@
 import assert from 'node:assert/strict'
 import { mkdtempSync, rmSync } from 'node:fs'
-import { writeFile } from 'node:fs/promises'
+import { readFile, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, relative } from 'node:path'
 import { describe, it } from 'node:test'
 
 import { WebcamError } from '../src/errors'
 import { resetLogger, setLogger, WebcamLogEntry } from '../src/logger'
-import { BaseWebcam, WebcamCommand } from '../src/webcams/BaseWebcam'
+import {
+  BaseWebcam,
+  WebcamCaptureExecution,
+  WebcamCommand
+} from '../src/webcams/BaseWebcam'
 import { Shot } from '../src/utils'
 
 type ConsoleCall = {
@@ -127,6 +131,22 @@ class CommandWebcam extends BaseWebcam {
 
   generateCommand() {
     return this.#command
+  }
+}
+
+class BufferWebcam extends BaseWebcam {
+  protected getBackendType() {
+    return 'native' as const
+  }
+
+  protected createCaptureExecution(): WebcamCaptureExecution {
+    return {
+      run: async () => ({
+        buffer: Buffer.from([1, 2, 3]),
+        kind: 'buffer',
+        mimeType: 'image/png'
+      })
+    }
   }
 }
 
@@ -575,12 +595,34 @@ describe('BaseWebcam', () => {
       })
 
       assert.equal(result.backend, 'CommandWebcam')
+      assert.equal(result.backendType, 'legacy')
       assert.equal(result.bytes, 3)
       assert.deepEqual([...result.buffer], [1, 2, 3])
       assert.equal(result.location, path)
       assert.equal(result.mimeType, 'image/png')
       assert.equal(typeof result.elapsedMs, 'number')
       assert.equal(typeof result.queueWaitMs, 'number')
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
+  })
+
+  it('returns the same public result shape for buffer-producing backends', async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'node-webcam-'))
+    const path = join(directory, 'native-photo.png')
+    const webcam = new BufferWebcam({ output: 'png' })
+
+    try {
+      const result = await webcam.capture({ location: path })
+
+      assert.equal(result.backend, 'BufferWebcam')
+      assert.equal(result.backendType, 'native')
+      assert.equal(result.bytes, 3)
+      assert.deepEqual([...result.buffer], [1, 2, 3])
+      assert.deepEqual([...(await readFile(path))], [1, 2, 3])
+      assert.equal(result.location, path)
+      assert.equal(result.mimeType, 'image/png')
+      assert.equal(result.toBase64(), 'data:image/png;base64,AQID')
     } finally {
       rmSync(directory, { recursive: true, force: true })
     }
@@ -631,6 +673,7 @@ describe('BaseWebcam', () => {
       const successDetails = calls[1].args[2] as Record<string, unknown>
 
       assert.equal(startDetails.backend, 'CommandWebcam')
+      assert.equal(startDetails.backendType, 'legacy')
       assert.equal(startDetails.file, process.execPath)
       assert.deepEqual(startDetails.args, ['-e', writeFixtureImageScript, path])
       assert.equal(startDetails.path, path)

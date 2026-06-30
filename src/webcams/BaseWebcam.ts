@@ -1,5 +1,5 @@
 import { execFile } from 'child_process'
-import { readFile } from 'fs/promises'
+import { readFile, writeFile } from 'fs/promises'
 import { basename, resolve } from 'path'
 import { promisify } from 'util'
 
@@ -9,7 +9,7 @@ import {
   getCommandErrorMessage
 } from '../errors'
 import { logDiagnostic } from '../logger'
-import { recordCaptureMetric } from '../metrics'
+import { recordCaptureMetric, WebcamBackendType } from '../metrics'
 import { Shot, getPlatformCameras, setDefaults } from '../utils'
 import type { WebcamConfig } from '../types'
 
@@ -24,12 +24,30 @@ export type WebcamCommand = {
   args: string[]
 }
 
+export type WebcamBackendCapture =
+  | {
+      buffer: Buffer
+      kind: 'buffer'
+      mimeType?: string
+    }
+  | {
+      kind: 'file'
+      mimeType?: string
+      path: string
+    }
+
+export type WebcamCaptureExecution = {
+  details?: Record<string, unknown>
+  run: () => Promise<WebcamBackendCapture>
+}
+
 export type WebcamCaptureOptions = {
   location: string
 }
 
 export type WebcamCaptureResult = {
   backend: string
+  backendType: WebcamBackendType
   buffer: Buffer
   bytes: number
   elapsedMs: number
@@ -177,6 +195,14 @@ class BaseWebcam {
     return this.constructor.name
   }
 
+  protected getBackendType(): WebcamBackendType {
+    return 'legacy'
+  }
+
+  protected getCaptureMimeType() {
+    return `image/${this.#options.output}`
+  }
+
   protected getCaptureQueueKeys(path: string) {
     const device =
       typeof this.#options.device === 'string' && this.#options.device.trim()
@@ -209,6 +235,26 @@ class BaseWebcam {
       signal: this.#options.signal,
       timeout: this.#options.timeout
     })
+  }
+
+  protected createCaptureExecution(path: string): WebcamCaptureExecution {
+    const command = this.generateCommand(path)
+
+    return {
+      details: {
+        args: command.args,
+        file: command.file
+      },
+      run: async () => {
+        await this.executeCommand(command)
+
+        return {
+          kind: 'file',
+          mimeType: this.getCaptureMimeType(),
+          path
+        }
+      }
+    }
   }
 
   async capture({
@@ -269,21 +315,21 @@ class BaseWebcam {
     const queuedAt = Date.now()
 
     return runQueued(this.getCaptureQueueKeys(path), async () =>
-      this.runCapture(this.generateCommand(path), path, Date.now() - queuedAt)
+      this.runCapture(path, Date.now() - queuedAt)
     )
   }
 
-  private async runCapture(
-    command: WebcamCommand,
-    path: string,
-    queueWaitMs: number
-  ) {
+  private async runCapture(path: string, queueWaitMs: number) {
     const operationId = this.createDiagnosticId('capture')
     const startedAt = Date.now()
-    const diagnosticBase = {
-      args: command.args,
-      backend: this.getBackendName(),
-      file: command.file,
+    const execution = this.createCaptureExecution(path)
+    const backend = this.getBackendName()
+    const backendType = this.getBackendType()
+    const diagnosticDetails = execution.details ?? {}
+    const diagnosticBase: Record<string, unknown> = {
+      ...diagnosticDetails,
+      backend,
+      backendType,
       operationId,
       path,
       queueWaitMs,
@@ -292,25 +338,30 @@ class BaseWebcam {
 
     this.logDiagnostic('capture:start', diagnosticBase)
 
+    let capture: WebcamBackendCapture
+
     try {
-      await this.executeCommand(command)
+      capture = await execution.run()
     } catch (error) {
       const code = getCommandErrorCode(error, {
         timeout: this.#options.timeout
       })
       const elapsedMs = this.getElapsedMs(startedAt)
+      const file =
+        typeof diagnosticBase.file === 'string'
+          ? diagnosticBase.file
+          : this.getBackendName()
       const typedError = new WebcamError({
         code,
         message: getCommandErrorMessage({
           code,
-          file: command.file,
+          file,
           timeout: this.#options.timeout
         }),
         cause: error,
         details: {
-          args: command.args,
+          ...diagnosticDetails,
           elapsedMs,
-          file: command.file,
           operationId,
           path,
           signalAborted: this.#options.signal?.aborted ?? false,
@@ -319,7 +370,8 @@ class BaseWebcam {
       })
 
       recordCaptureMetric({
-        backend: this.getBackendName(),
+        backend,
+        backendType,
         bytes: 0,
         code,
         elapsedMs,
@@ -341,9 +393,16 @@ class BaseWebcam {
     }
 
     let buffer: Buffer
+    let mimeType = capture.mimeType ?? this.getCaptureMimeType()
 
     try {
-      buffer = await readFile(path)
+      if (capture.kind === 'buffer') {
+        buffer = Buffer.from(capture.buffer)
+        await writeFile(path, buffer)
+      } else {
+        buffer = await readFile(capture.path)
+        mimeType = capture.mimeType ?? this.getCaptureMimeType()
+      }
     } catch (error) {
       const elapsedMs = this.getElapsedMs(startedAt)
       const typedError = new WebcamError({
@@ -358,7 +417,8 @@ class BaseWebcam {
       })
 
       recordCaptureMetric({
-        backend: this.getBackendName(),
+        backend,
+        backendType,
         bytes: 0,
         code: 'OUTPUT_READ_FAILED',
         elapsedMs,
@@ -384,7 +444,8 @@ class BaseWebcam {
     const elapsedMs = this.getElapsedMs(startedAt)
 
     recordCaptureMetric({
-      backend: this.getBackendName(),
+      backend,
+      backendType,
       bytes: buffer.length,
       elapsedMs,
       queueWaitMs,
@@ -402,12 +463,13 @@ class BaseWebcam {
     )
 
     return {
-      backend: this.getBackendName(),
+      backend,
+      backendType,
       buffer,
       bytes: buffer.length,
       elapsedMs,
       location: path,
-      mimeType: `image/${this.#options.output}`,
+      mimeType,
       queueWaitMs,
       toBase64: () => this.getBase64FromBuffer(buffer)
     }
