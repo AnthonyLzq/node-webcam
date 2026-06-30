@@ -59,6 +59,13 @@
       "default": "./dist/esm/index.js"
     }
   },
+  "nodeWebcam": {
+    "commandCam": {
+      "releaseTag": "v2.1.0",
+      "sha256": "012d3ff83b1e65182807512fc9d04bcfdb40736fcdc2f7aba57531cbf031769e",
+      "minBytes": 1024
+    }
+  },
   "files": [
     "bin/postinstall.js",
     "dist",

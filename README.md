@@ -30,7 +30,13 @@ brew install imagesnap
 
 ### Windows
 
-Standalone exe included. See [src/bindings/CommandCam](https://github.com/chuckfairy/node-webcam/tree/master/src/bindings/CommandCam)
+Windows uses `CommandCam.exe`. The package `postinstall` downloads the release
+asset on Windows, verifies its SHA-256 checksum, and installs it under the built
+package bindings. The CommandCam release tag and checksum are pinned in
+`package.json` and only need updates when that binary changes. Set
+`NODE_WEBCAM_SKIP_COMMANDCAM_DOWNLOAD=1` to skip the download, or
+`NODE_WEBCAM_COMMANDCAM_STRICT=1` to fail installation if the verified download
+cannot complete.
 
 ## Usage
 
