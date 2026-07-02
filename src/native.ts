@@ -1,5 +1,6 @@
 import { existsSync } from 'fs'
-import { resolve } from 'path'
+import { createRequire } from 'module'
+import { join, resolve } from 'path'
 
 export type NativeV4l2Options = {
   device: string
@@ -14,6 +15,12 @@ export type NativeWebcamAddon = {
 }
 
 const nativeAddonFile = ['build', 'Release', 'node_webcam_native.node']
+const requireFromNative = createRequire(resolve(__dirname, 'native.js'))
+const defaultNativePackageRoots = [
+  resolve(__dirname, '..', '..'),
+  resolve(__dirname, '..'),
+  process.cwd()
+]
 const defaultNativeAddonPaths = [
   resolve(__dirname, '..', ...nativeAddonFile),
   resolve(__dirname, '..', '..', ...nativeAddonFile),
@@ -32,22 +39,39 @@ const isNativeWebcamAddon = (
   typeof candidate.captureMjpeg === 'function'
 
 const loadNativeWebcamAddon = (addonPath?: string) => {
-  const addonPaths = addonPath ? [addonPath] : defaultNativeAddonPaths
-  const resolvedAddonPath = addonPaths.find(path => existsSync(path))
+  if (process.platform !== 'linux') return undefined
 
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  if (!resolvedAddonPath) return undefined
+  if (addonPath) {
+    if (!existsSync(addonPath)) return undefined
 
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const candidate: unknown = require(resolvedAddonPath)
+    const candidate: unknown = requireFromNative(addonPath)
 
-  if (!isNativeWebcamAddon(candidate)) return undefined
+    if (!isNativeWebcamAddon(candidate)) return undefined
 
-  return candidate
+    return candidate
+  }
+
+  for (const packageRoot of defaultNativePackageRoots) {
+    if (!existsSync(join(packageRoot, 'package.json'))) continue
+
+    try {
+      const nodeGypBuild = requireFromNative('node-gyp-build') as (
+        dir: string
+      ) => unknown
+      const candidate = nodeGypBuild(packageRoot)
+
+      if (isNativeWebcamAddon(candidate)) return candidate
+    } catch (_error) {
+      continue
+    }
+  }
+
+  return undefined
 }
 
 export {
   defaultNativeAddonPath,
+  defaultNativePackageRoots,
   defaultNativeAddonPaths,
   loadNativeWebcamAddon
 }

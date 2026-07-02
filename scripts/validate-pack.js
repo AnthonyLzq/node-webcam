@@ -16,10 +16,13 @@ const requiredPackageEntries = [
   'LICENSE',
   'README.md',
   'bin/postinstall.js',
+  'binding.gyp',
   'dist/cjs/index.js',
   'dist/esm/index.js',
   'dist/esm/package.json',
   'dist/types/index.d.ts',
+  'native/linux_v4l2.cc',
+  'native/unsupported.cc',
   'package.json'
 ]
 
@@ -41,6 +44,7 @@ const parsePackOutput = output => {
 
 let tarballPath
 let consumerDirectory
+let lifecycleConsumerDirectory
 
 try {
   const pack = parsePackOutput(exec('npm', ['pack', '--json', '--ignore-scripts']))
@@ -52,6 +56,9 @@ try {
   const missingEntries = requiredPackageEntries.filter(
     entry => !packageEntries.includes(entry)
   )
+  const nativePrebuildEntries = packageEntries.filter(entry =>
+    /^prebuilds\/linux-[^/]+\/.+\.node$/.test(entry)
+  )
 
   if (forbiddenEntries.length > 0)
     throw new Error(
@@ -62,6 +69,9 @@ try {
     throw new Error(
       `Required entries missing from package tarball: ${missingEntries.join(', ')}`
     )
+
+  if (nativePrebuildEntries.length === 0)
+    throw new Error('Required Linux native prebuild missing from package tarball')
 
   consumerDirectory = mkdtempSync(join(tmpdir(), 'node-webcam-consumer-'))
 
@@ -86,6 +96,34 @@ try {
     }
   )
 
+  lifecycleConsumerDirectory = mkdtempSync(
+    join(tmpdir(), 'node-webcam-lifecycle-consumer-')
+  )
+
+  writeFileSync(
+    join(lifecycleConsumerDirectory, 'package.json'),
+    JSON.stringify(
+      { name: 'node-webcam-lifecycle-consumer', private: true },
+      null,
+      2
+    )
+  )
+
+  execFileSync(
+    'npm',
+    [
+      'install',
+      '--no-audit',
+      '--no-fund',
+      '--no-package-lock',
+      tarballPath
+    ],
+    {
+      cwd: lifecycleConsumerDirectory,
+      stdio: 'ignore'
+    }
+  )
+
   execFileSync(
     process.execPath,
     [
@@ -94,7 +132,9 @@ try {
         "const webcam = require('@anthonylzq/node-webcam')",
         "for (const key of ['capture', 'create', 'list', 'listWebcams', 'getMetricsReport', 'resetMetrics']) {",
         "  if (typeof webcam[key] !== 'function') throw new Error(`Missing export: ${key}`)",
-        '}'
+        '}',
+        "const instance = webcam.create({ output: 'jpeg', saveShots: false })",
+        "if (!['native', 'legacy'].includes(instance.getBackendType())) throw new Error('Unexpected backend type')"
       ].join('\n')
     ],
     {
@@ -109,7 +149,9 @@ try {
       "import * as webcam from '@anthonylzq/node-webcam'",
       "for (const key of ['capture', 'create', 'list', 'listWebcams', 'getMetricsReport', 'resetMetrics']) {",
       "  if (typeof webcam[key] !== 'function') throw new Error(`Missing ESM export: ${key}`)",
-      '}'
+      '}',
+      "const instance = webcam.create({ output: 'jpeg', saveShots: false })",
+      "if (!['native', 'legacy'].includes(instance.getBackendType())) throw new Error('Unexpected ESM backend type')"
     ].join('\n')
   )
 
@@ -183,4 +225,6 @@ try {
   if (tarballPath) rmSync(tarballPath, { force: true })
   if (consumerDirectory)
     rmSync(consumerDirectory, { force: true, recursive: true })
+  if (lifecycleConsumerDirectory)
+    rmSync(lifecycleConsumerDirectory, { force: true, recursive: true })
 }

@@ -6,8 +6,12 @@ Cross platform webcam usage
 
 ### Linux
 
+Linux uses the bundled native V4L2 addon when a matching prebuild is available.
+If the native addon cannot be loaded or does not support the requested output,
+the package falls back to `fswebcam`.
+
 ```
-# Linux relies on fswebcam currently
+# Optional fallback backend
 # ubuntu
 
 sudo apt-get install fswebcam
