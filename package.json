@@ -18,6 +18,8 @@
     "lint": "npm run lint:check",
     "lint:check": "eslint src tests --ext .ts",
     "lint:fix": "eslint --fix src tests --ext .ts",
+    "native:build": "node-gyp rebuild",
+    "native:smoke": "npm run native:build && node scripts/smoke-native-v4l2.js",
     "pack:check": "npm run check && npm run build && node scripts/validate-pack.js",
     "prepare": "npm run build",
     "prepack": "npm run check",
