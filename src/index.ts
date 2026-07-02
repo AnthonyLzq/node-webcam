@@ -1,7 +1,13 @@
 import os from 'os'
 
 import { WebcamError } from './errors'
-import { BaseWebcam, FSWebcam, ImageSnapWebcam, WindowsWebcam } from './webcams'
+import {
+  BaseWebcam,
+  FSWebcam,
+  ImageSnapWebcam,
+  NativeLinuxWebcam,
+  WindowsWebcam
+} from './webcams'
 import { getPlatformCameras } from './utils'
 import type { WebcamCaptureResult } from './webcams/BaseWebcam'
 import type { WebcamConfig } from './types'
@@ -14,11 +20,14 @@ type CaptureRequest = {
 
 const supportedPlatforms = ['linux', 'darwin', 'win32']
 
-const create = (options: Partial<WebcamConfig> = {}) => {
+const create = (options: Partial<WebcamConfig> = {}): BaseWebcam => {
   const currentPlatform = os.platform()
 
   switch (currentPlatform) {
     case 'linux':
+      if (NativeLinuxWebcam.isAvailable(options))
+        return new NativeLinuxWebcam(options)
+
       return new FSWebcam(options)
     case 'darwin':
       return new ImageSnapWebcam(options)
