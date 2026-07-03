@@ -23,23 +23,45 @@ yay -S ffmpeg fswebcam
 
 ### Mac OSX
 
+macOS uses `ffmpeg` when it is installed, then falls back to `imagesnap`.
+
 ```
-# Mac OSX relies on imagesnap
+# Optional preferred backend
+brew install ffmpeg
+
+# Legacy fallback backend
 # Repo https://github.com/rharder/imagesnap
-# Available through brew
 
 brew install imagesnap
 ```
 
 ### Windows
 
-Windows uses `CommandCam.exe`. The package `postinstall` downloads the release
-asset on Windows, verifies its SHA-256 checksum, and installs it under the built
-package bindings. The CommandCam release tag and checksum are pinned in
-`package.json` and only need updates when that binary changes. Set
-`NODE_WEBCAM_SKIP_COMMANDCAM_DOWNLOAD=1` to skip the download, or
-`NODE_WEBCAM_COMMANDCAM_STRICT=1` to fail installation if the verified download
-cannot complete.
+Windows uses `ffmpeg` when it is installed and a camera `device` name is
+provided, then falls back to `CommandCam.exe`. The package `postinstall`
+downloads the CommandCam release asset on Windows, verifies its SHA-256
+checksum, and installs it under the built package bindings. The CommandCam
+release tag and checksum are pinned in `package.json` and only need updates when
+that binary changes. Set `NODE_WEBCAM_SKIP_COMMANDCAM_DOWNLOAD=1` to skip the
+download, or `NODE_WEBCAM_COMMANDCAM_STRICT=1` to fail installation if the
+verified download cannot complete.
+
+## Backend selection
+
+`capture()` and `create()` choose the first available backend for the current
+platform. The public API does not require backend selection.
+
+| Platform | Selection order |
+| --- | --- |
+| Linux | `native:v4l2` -> `ffmpeg:v4l2` -> `fswebcam` |
+| macOS | `ffmpeg:avfoundation` -> `imagesnap` |
+| Windows | `ffmpeg:dshow` -> `CommandCam` |
+
+Fallback only happens while selecting a backend. If the selected backend starts
+a capture and fails because of permissions, an invalid device, a timeout, or an
+unsupported format, the error is surfaced instead of silently trying the next
+backend. The backend used for a capture is available as `result.backend` and
+`result.backendType`.
 
 ## Usage
 
