@@ -392,9 +392,12 @@ class BaseWebcam {
     try {
       capture = await execution.run()
     } catch (error) {
-      const code = getCommandErrorCode(error, {
-        timeout: this.#options.timeout
-      })
+      const code =
+        error instanceof WebcamError
+          ? error.code
+          : getCommandErrorCode(error, {
+              timeout: this.#options.timeout
+            })
       const elapsedMs = this.getElapsedMs(startedAt)
       const file =
         typeof diagnosticBase.file === 'string'
@@ -402,13 +405,17 @@ class BaseWebcam {
           : this.getBackendName()
       const typedError = new WebcamError({
         code,
-        message: getCommandErrorMessage({
-          code,
-          file,
-          timeout: this.#options.timeout
-        }),
+        message:
+          error instanceof WebcamError
+            ? error.message
+            : getCommandErrorMessage({
+                code,
+                file,
+                timeout: this.#options.timeout
+              }),
         cause: error,
         details: {
+          ...(error instanceof WebcamError ? error.details : {}),
           ...diagnosticDetails,
           elapsedMs,
           operationId,

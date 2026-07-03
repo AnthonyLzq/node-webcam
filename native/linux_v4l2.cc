@@ -13,6 +13,7 @@
 #include <cstdint>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -31,6 +32,19 @@ namespace {
   struct MappedBuffer {
     void* start = nullptr;
     size_t length = 0;
+  };
+
+  class NativeCaptureError : public std::runtime_error {
+    private:
+    std::string code_;
+
+    public:
+    NativeCaptureError(std::string code, const std::string& message)
+      : std::runtime_error(message), code_(std::move(code)) {}
+
+    const std::string& code() const {
+      return code_;
+    }
   };
 
   /**
@@ -98,6 +112,28 @@ namespace {
     return message + ": " + strerror(errno);
   }
 
+  NativeCaptureError NativeSystemError(
+    const std::string& code,
+    const std::string& message
+  ) {
+    return NativeCaptureError(code, SystemError(message));
+  }
+
+  std::string OpenErrorCode() {
+    switch (errno) {
+      case ENOENT:
+      case ENODEV:
+        return "NODE_WEBCAM_NATIVE_DEVICE_NOT_FOUND";
+      case EACCES:
+      case EPERM:
+        return "NODE_WEBCAM_NATIVE_PERMISSION_DENIED";
+      case EBUSY:
+        return "NODE_WEBCAM_NATIVE_DEVICE_BUSY";
+      default:
+        return "NODE_WEBCAM_NATIVE_CAPTURE_FAILED";
+    }
+  }
+
   /**
    * Runs ioctl() and retries transient EINTR interruptions.
    *
@@ -119,8 +155,12 @@ namespace {
     return result;
   }
 
-  void ThrowNodeError(napi_env env, const std::string& message) {
-    napi_throw_error(env, nullptr, message.c_str());
+  void ThrowNodeError(
+    napi_env env,
+    const std::string& code,
+    const std::string& message
+  ) {
+    napi_throw_error(env, code.c_str(), message.c_str());
   }
 
   /**
@@ -239,19 +279,22 @@ namespace {
     v4l2_capability capability = {};
 
     if (Xioctl(fd, VIDIOC_QUERYCAP, &capability) == -1)
-      throw std::runtime_error(
-        SystemError("Unable to query V4L2 capabilities for " + device)
+      throw NativeSystemError(
+        "NODE_WEBCAM_NATIVE_DEVICE_UNSUPPORTED",
+        "Unable to query V4L2 capabilities for " + device
       );
 
     const uint32_t capabilities = GetEffectiveCapabilities(capability);
 
     if (!(capabilities & V4L2_CAP_VIDEO_CAPTURE))
-      throw std::runtime_error(
+      throw NativeCaptureError(
+        "NODE_WEBCAM_NATIVE_DEVICE_UNSUPPORTED",
         "V4L2 device does not support video capture: " + device
       );
 
     if (!(capabilities & V4L2_CAP_STREAMING))
-      throw std::runtime_error(
+      throw NativeCaptureError(
+        "NODE_WEBCAM_NATIVE_DEVICE_UNSUPPORTED",
         "V4L2 device does not support streaming IO: " + device
       );
   }
@@ -268,12 +311,18 @@ namespace {
     format.fmt.pix.field = V4L2_FIELD_ANY;
 
     if (Xioctl(fd, VIDIOC_S_FMT, &format) == -1)
-      throw std::runtime_error(
-        SystemError("Unable to configure V4L2 MJPEG format")
+      throw NativeSystemError(
+        errno == EBUSY
+          ? "NODE_WEBCAM_NATIVE_DEVICE_BUSY"
+          : "NODE_WEBCAM_NATIVE_FORMAT_UNSUPPORTED",
+        "Unable to configure V4L2 MJPEG format"
       );
 
     if (format.fmt.pix.pixelformat != V4L2_PIX_FMT_MJPEG)
-      throw std::runtime_error("V4L2 device did not accept MJPEG pixel format");
+      throw NativeCaptureError(
+        "NODE_WEBCAM_NATIVE_FORMAT_UNSUPPORTED",
+        "V4L2 device did not accept MJPEG pixel format"
+      );
   }
 
   /**
@@ -293,10 +342,16 @@ namespace {
     request.memory = V4L2_MEMORY_MMAP;
 
     if (Xioctl(fd, VIDIOC_REQBUFS, &request) == -1)
-      throw std::runtime_error(SystemError("Unable to request V4L2 buffers"));
+      throw NativeSystemError(
+        "NODE_WEBCAM_NATIVE_CAPTURE_FAILED",
+        "Unable to request V4L2 buffers"
+      );
 
     if (request.count < 2)
-      throw std::runtime_error("V4L2 device returned insufficient buffers");
+      throw NativeCaptureError(
+        "NODE_WEBCAM_NATIVE_CAPTURE_FAILED",
+        "V4L2 device returned insufficient buffers"
+      );
 
     MappedBuffers mappedBuffers;
 
@@ -307,7 +362,10 @@ namespace {
       buffer.index = index;
 
       if (Xioctl(fd, VIDIOC_QUERYBUF, &buffer) == -1)
-        throw std::runtime_error(SystemError("Unable to query V4L2 buffer"));
+        throw NativeSystemError(
+          "NODE_WEBCAM_NATIVE_CAPTURE_FAILED",
+          "Unable to query V4L2 buffer"
+        );
 
       // Map this driver buffer into process memory. The returned pointer is where
       // frame bytes will become readable after the driver fills this buffer.
@@ -321,7 +379,10 @@ namespace {
       );
 
       if (start == MAP_FAILED)
-        throw std::runtime_error(SystemError("Unable to map V4L2 buffer"));
+        throw NativeSystemError(
+          "NODE_WEBCAM_NATIVE_CAPTURE_FAILED",
+          "Unable to map V4L2 buffer"
+        );
 
       mappedBuffers.push({start, buffer.length});
     }
@@ -338,7 +399,10 @@ namespace {
       buffer.index = index;
 
       if (Xioctl(fd, VIDIOC_QBUF, &buffer) == -1)
-        throw std::runtime_error(SystemError("Unable to queue V4L2 buffer"));
+        throw NativeSystemError(
+          "NODE_WEBCAM_NATIVE_CAPTURE_FAILED",
+          "Unable to queue V4L2 buffer"
+        );
     }
   }
 
@@ -357,9 +421,16 @@ namespace {
     const int result = select(fd + 1, &descriptors, nullptr, nullptr, &timeout);
 
     if (result == -1)
-      throw std::runtime_error(SystemError("Unable to wait for V4L2 frame"));
+      throw NativeSystemError(
+        "NODE_WEBCAM_NATIVE_CAPTURE_FAILED",
+        "Unable to wait for V4L2 frame"
+      );
 
-    if (result == 0) throw std::runtime_error("Timed out waiting for V4L2 frame");
+    if (result == 0)
+      throw NativeCaptureError(
+        "NODE_WEBCAM_NATIVE_FRAME_TIMEOUT",
+        "Timed out waiting for V4L2 frame"
+      );
   }
 
   // End-to-end V4L2 capture:
@@ -374,8 +445,9 @@ namespace {
     const int fd = open(options.device.c_str(), O_RDWR | O_NONBLOCK, 0);
 
     if (fd == -1)
-      throw std::runtime_error(
-        SystemError("Unable to open V4L2 device " + options.device)
+      throw NativeSystemError(
+        OpenErrorCode(),
+        "Unable to open V4L2 device " + options.device
       );
 
     FileDescriptor device(fd);
@@ -390,7 +462,12 @@ namespace {
     v4l2_buf_type type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 
     if (Xioctl(device.get(), VIDIOC_STREAMON, &type) == -1)
-      throw std::runtime_error(SystemError("Unable to start V4L2 stream"));
+      throw NativeSystemError(
+        errno == EBUSY
+          ? "NODE_WEBCAM_NATIVE_DEVICE_BUSY"
+          : "NODE_WEBCAM_NATIVE_CAPTURE_FAILED",
+        "Unable to start V4L2 stream"
+      );
 
     bool streaming = true;
 
@@ -405,14 +482,23 @@ namespace {
         if (Xioctl(device.get(), VIDIOC_DQBUF, &buffer) == -1) {
           if (errno == EAGAIN) continue;
 
-          throw std::runtime_error(SystemError("Unable to dequeue V4L2 frame"));
+          throw NativeSystemError(
+            "NODE_WEBCAM_NATIVE_CAPTURE_FAILED",
+            "Unable to dequeue V4L2 frame"
+          );
         }
 
         if (buffer.index >= mappedBuffers.size())
-          throw std::runtime_error("V4L2 returned an out-of-range buffer index");
+          throw NativeCaptureError(
+            "NODE_WEBCAM_NATIVE_CAPTURE_FAILED",
+            "V4L2 returned an out-of-range buffer index"
+          );
 
         if (buffer.bytesused == 0)
-          throw std::runtime_error("V4L2 returned an empty frame");
+          throw NativeCaptureError(
+            "NODE_WEBCAM_NATIVE_FRAME_EMPTY",
+            "V4L2 returned an empty frame"
+          );
 
         const MappedBuffer& mappedBuffer = mappedBuffers.at(buffer.index);
         const auto* frameStart =
@@ -475,8 +561,16 @@ namespace {
       napi_create_buffer_copy(env, frame.size(), frame.data(), nullptr, &buffer);
 
       return buffer;
+    } catch (const NativeCaptureError& error) {
+      ThrowNodeError(env, error.code(), error.what());
+
+      return nullptr;
     } catch (const std::exception& error) {
-      ThrowNodeError(env, error.what());
+      ThrowNodeError(
+        env,
+        "NODE_WEBCAM_NATIVE_CAPTURE_FAILED",
+        error.what()
+      );
 
       return nullptr;
     }

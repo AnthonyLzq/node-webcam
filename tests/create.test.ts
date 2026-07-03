@@ -23,6 +23,17 @@ const availableNativeAddon: NativeWebcamAddon = {
   isAvailable: () => true
 }
 
+const createFailingNativeAddon = (code: string, message: string) => ({
+  captureMjpeg: () => {
+    const error = new Error(message) as Error & { code: string }
+
+    error.code = code
+
+    throw error
+  },
+  isAvailable: () => true
+})
+
 describe('create', () => {
   afterEach(() => {
     mock.restoreAll()
@@ -69,6 +80,30 @@ describe('create', () => {
     })
 
     assert.equal(available, false)
+  })
+
+  it('maps native Linux addon errors to WebcamError codes', async () => {
+    const cases = [
+      ['NODE_WEBCAM_NATIVE_DEVICE_NOT_FOUND', 'NATIVE_DEVICE_NOT_FOUND'],
+      ['NODE_WEBCAM_NATIVE_PERMISSION_DENIED', 'NATIVE_PERMISSION_DENIED'],
+      ['NODE_WEBCAM_NATIVE_DEVICE_BUSY', 'NATIVE_DEVICE_BUSY'],
+      ['NODE_WEBCAM_NATIVE_DEVICE_UNSUPPORTED', 'NATIVE_DEVICE_UNSUPPORTED'],
+      ['NODE_WEBCAM_NATIVE_FORMAT_UNSUPPORTED', 'NATIVE_FORMAT_UNSUPPORTED'],
+      ['NODE_WEBCAM_NATIVE_FRAME_TIMEOUT', 'NATIVE_FRAME_TIMEOUT'],
+      ['NODE_WEBCAM_NATIVE_FRAME_EMPTY', 'NATIVE_FRAME_EMPTY'],
+      ['NODE_WEBCAM_NATIVE_CAPTURE_FAILED', 'NATIVE_CAPTURE_FAILED']
+    ] as const
+
+    for (const [nativeCode, code] of cases) {
+      const webcam = new NativeLinuxWebcam({
+        nativeAddon: createFailingNativeAddon(nativeCode, nativeCode)
+      })
+
+      await assert.rejects(() => webcam.capture({ location: 'photo.jpeg' }), {
+        code,
+        name: 'WebcamError'
+      })
+    }
   })
 
   it('creates the macOS backend on darwin', () => {

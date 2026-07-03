@@ -104,7 +104,11 @@ const updateCaptureMetrics = (
   else captureMetrics.failed += 1
 
   if (metric.code === 'COMMAND_ABORTED') captureMetrics.aborted += 1
-  if (metric.code === 'COMMAND_TIMEOUT') captureMetrics.timedOut += 1
+  if (
+    metric.code === 'COMMAND_TIMEOUT' ||
+    metric.code === 'NATIVE_FRAME_TIMEOUT'
+  )
+    captureMetrics.timedOut += 1
 }
 
 const recordCaptureMetric = (metric: WebcamCaptureMetric) => {
