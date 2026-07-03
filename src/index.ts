@@ -3,6 +3,7 @@ import os from 'os'
 import { WebcamError } from './errors'
 import {
   BaseWebcam,
+  FFmpegWebcam,
   FSWebcam,
   ImageSnapWebcam,
   NativeLinuxWebcam,
@@ -28,10 +29,19 @@ const create = (options: Partial<WebcamConfig> = {}): BaseWebcam => {
       if (NativeLinuxWebcam.isAvailable(options))
         return new NativeLinuxWebcam(options)
 
+      if (FFmpegWebcam.isAvailable(options, currentPlatform))
+        return new FFmpegWebcam(options, currentPlatform)
+
       return new FSWebcam(options)
     case 'darwin':
+      if (FFmpegWebcam.isAvailable(options, currentPlatform))
+        return new FFmpegWebcam(options, currentPlatform)
+
       return new ImageSnapWebcam(options)
     case 'win32':
+      if (FFmpegWebcam.isAvailable(options, currentPlatform))
+        return new FFmpegWebcam(options, currentPlatform)
+
       return new WindowsWebcam(options)
     default:
       throw new WebcamError({

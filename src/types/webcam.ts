@@ -28,6 +28,9 @@ export type WebcamConfig = {
   // false for default device
   device: string | false // ''
 
+  // Optional ffmpeg binary path. Defaults to "ffmpeg" from PATH.
+  ffmpegPath?: string
+
   // Logging
   verbose: boolean // false
 

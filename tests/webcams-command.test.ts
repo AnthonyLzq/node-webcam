@@ -2,7 +2,12 @@ import assert from 'node:assert/strict'
 import { resolve } from 'node:path'
 import { describe, it } from 'node:test'
 
-import { FSWebcam, ImageSnapWebcam, WindowsWebcam } from '../src/webcams'
+import {
+  FFmpegWebcam,
+  FSWebcam,
+  ImageSnapWebcam,
+  WindowsWebcam
+} from '../src/webcams'
 
 describe('backend command generation', () => {
   it('preserves the default fswebcam command', () => {
@@ -147,6 +152,94 @@ describe('backend command generation', () => {
     assert.deepEqual(webcam.generateCommand('photo.bmp'), {
       file: bin,
       args: ['/delay', '2000', '/devnum', '1', '/filename', 'photo.bmp']
+    })
+  })
+
+  it('builds the Linux ffmpeg command', () => {
+    const webcam = new FFmpegWebcam(
+      {
+        device: '/dev/video2',
+        ffmpegPath: '/usr/bin/ffmpeg',
+        output: 'jpg'
+      },
+      'linux'
+    )
+
+    assert.deepEqual(webcam.generateCommand('photo.jpg'), {
+      file: '/usr/bin/ffmpeg',
+      args: [
+        '-hide_banner',
+        '-loglevel',
+        'error',
+        '-video_size',
+        '1280x720',
+        '-f',
+        'video4linux2',
+        '-i',
+        '/dev/video2',
+        '-frames:v',
+        '1',
+        '-y',
+        'photo.jpg'
+      ]
+    })
+  })
+
+  it('builds the macOS ffmpeg command', () => {
+    const webcam = new FFmpegWebcam(
+      {
+        device: 'FaceTime HD Camera',
+        ffmpegPath: '/usr/bin/ffmpeg'
+      },
+      'darwin'
+    )
+
+    assert.deepEqual(webcam.generateCommand('photo.jpeg'), {
+      file: '/usr/bin/ffmpeg',
+      args: [
+        '-hide_banner',
+        '-loglevel',
+        'error',
+        '-video_size',
+        '1280x720',
+        '-f',
+        'avfoundation',
+        '-i',
+        'FaceTime HD Camera:none',
+        '-frames:v',
+        '1',
+        '-y',
+        'photo.jpeg'
+      ]
+    })
+  })
+
+  it('builds the Windows ffmpeg command', () => {
+    const webcam = new FFmpegWebcam(
+      {
+        device: 'Integrated Webcam',
+        ffmpegPath: 'C:\\ffmpeg\\ffmpeg.exe'
+      },
+      'win32'
+    )
+
+    assert.deepEqual(webcam.generateCommand('photo.jpeg'), {
+      file: 'C:\\ffmpeg\\ffmpeg.exe',
+      args: [
+        '-hide_banner',
+        '-loglevel',
+        'error',
+        '-video_size',
+        '1280x720',
+        '-f',
+        'dshow',
+        '-i',
+        'video=Integrated Webcam',
+        '-frames:v',
+        '1',
+        '-y',
+        'photo.jpeg'
+      ]
     })
   })
 

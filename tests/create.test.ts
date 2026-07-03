@@ -9,6 +9,7 @@ import {
   WebcamError,
   WindowsWebcam
 } from '../src'
+import { FFmpegWebcam } from '../src/webcams/FFmpegWebcam'
 import { NativeLinuxWebcam } from '../src/webcams/NativeLinuxWebcam'
 import type { NativeWebcamAddon } from '../src/native'
 
@@ -29,10 +30,20 @@ describe('create', () => {
 
   it('creates the linux backend on linux', () => {
     mock.method(os, 'platform', () => 'linux')
+    mock.method(FFmpegWebcam, 'isAvailable', () => false)
 
     const webcam = create({ output: 'png' })
 
     assert.ok(webcam instanceof FSWebcam)
+  })
+
+  it('uses ffmpeg on Linux before falling back to fswebcam', () => {
+    mock.method(os, 'platform', () => 'linux')
+    mock.method(FFmpegWebcam, 'isAvailable', () => true)
+
+    const webcam = create({ output: 'png' })
+
+    assert.ok(webcam instanceof FFmpegWebcam)
   })
 
   it('reports the native Linux backend as available when its addon is available', () => {
@@ -62,18 +73,38 @@ describe('create', () => {
 
   it('creates the macOS backend on darwin', () => {
     mock.method(os, 'platform', () => 'darwin')
+    mock.method(FFmpegWebcam, 'isAvailable', () => false)
 
     const webcam = create()
 
     assert.ok(webcam instanceof ImageSnapWebcam)
   })
 
+  it('uses ffmpeg on macOS before falling back to imagesnap', () => {
+    mock.method(os, 'platform', () => 'darwin')
+    mock.method(FFmpegWebcam, 'isAvailable', () => true)
+
+    const webcam = create()
+
+    assert.ok(webcam instanceof FFmpegWebcam)
+  })
+
   it('creates the Windows backend on win32', () => {
     mock.method(os, 'platform', () => 'win32')
+    mock.method(FFmpegWebcam, 'isAvailable', () => false)
 
     const webcam = create()
 
     assert.ok(webcam instanceof WindowsWebcam)
+  })
+
+  it('uses ffmpeg on Windows before falling back to CommandCam', () => {
+    mock.method(os, 'platform', () => 'win32')
+    mock.method(FFmpegWebcam, 'isAvailable', () => true)
+
+    const webcam = create({ device: 'Integrated Webcam' })
+
+    assert.ok(webcam instanceof FFmpegWebcam)
   })
 
   it('rejects unsupported current platforms', () => {
