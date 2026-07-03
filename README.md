@@ -51,6 +51,18 @@ verified download cannot complete.
 `capture()` and `create()` choose the first available backend for the current
 platform. The public API does not require backend selection.
 
+```mermaid
+flowchart LR
+  A["capture()"] --> B{"Platform"}
+  B -->|Linux| C["native:v4l2"]
+  C -->|unavailable| D["ffmpeg:v4l2"]
+  D -->|unavailable| E["fswebcam"]
+  B -->|macOS| F["ffmpeg:avfoundation"]
+  F -->|unavailable| G["imagesnap"]
+  B -->|Windows| H["ffmpeg:dshow"]
+  H -->|unavailable| I["CommandCam"]
+```
+
 | Platform | Selection order |
 | --- | --- |
 | Linux | `native:v4l2` -> `ffmpeg:v4l2` -> `fswebcam` |
@@ -62,6 +74,44 @@ a capture and fails because of permissions, an invalid device, a timeout, or an
 unsupported format, the error is surfaced instead of silently trying the next
 backend. The backend used for a capture is available as `result.backend` and
 `result.backendType`.
+
+## Native webcam performance
+
+The Linux native V4L2 backend avoids spawning a CLI for every capture, so it is
+usually faster for repeated webcam snapshots. Local benchmark snapshot:
+
+| Backend | 100 captures total | Mean | Median | p95 | Avg bytes |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `native:v4l2` | 28.92s | 289.24ms | 287.97ms | 288.72ms | 163,029 |
+| `fswebcam` | 36.16s | 361.59ms | 365.52ms | 371.97ms | 96,015 |
+| `ffmpeg:v4l2` | 37.51s | 375.09ms | 370.60ms | 385.05ms | 59,196 |
+
+Relative mean latency, scaled to the slowest backend in this run:
+
+| Backend | Mean latency | Relative bar |
+| --- | ---: | --- |
+| `native:v4l2` | 289.24ms | `███████████████░░░░░` |
+| `fswebcam` | 361.59ms | `███████████████████░` |
+| `ffmpeg:v4l2` | 375.09ms | `████████████████████` |
+
+Benchmark environment: Linux, `/dev/video0`, `1280x720`, 100 captures per
+backend. Results vary by camera, driver, resolution, codec, CPU, and whether
+the first capture is warmed up.
+
+Reproduce locally:
+
+```bash
+npm run benchmark:capture -- --iterations=100 --warmup=3 --backends=native,ffmpeg,fswebcam
+```
+
+The benchmark writes JSON and Markdown reports under `tmp/`:
+
+```txt
+tmp/benchmark-results.json
+tmp/benchmark-results.md
+tmp/benchmarks/<run-id>/results.json
+tmp/benchmarks/<run-id>/results.md
+```
 
 ## Usage
 

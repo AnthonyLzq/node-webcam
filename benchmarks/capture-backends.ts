@@ -30,10 +30,12 @@ type CaptureStats = {
 type BenchmarkReport = {
   backends: CaptureBackend[]
   device: string
+  generatedAt: string
   height: number
   iterations: number
   outputRoot: string
   results: Partial<Record<CaptureBackend, CaptureStats>>
+  warmup: number
   width: number
 }
 
@@ -92,6 +94,83 @@ const getBackends = (): CaptureBackend[] => {
   }
 
   return backends
+}
+
+const formatMs = (value: number) => `${value.toFixed(2)}ms`
+
+const formatBytes = (value: number) =>
+  new Intl.NumberFormat('en-US').format(value)
+
+const createBar = (value: number, max: number, width = 20) => {
+  const filled = Math.max(1, Math.round((value / max) * width))
+
+  return `${'█'.repeat(filled)}${'░'.repeat(width - filled)}`
+}
+
+const toMarkdownTable = (report: BenchmarkReport) => {
+  const lines = [
+    '# Capture backend benchmark',
+    '',
+    `- Generated at: ${report.generatedAt}`,
+    `- Device: \`${report.device}\``,
+    `- Resolution: ${report.width}x${report.height}`,
+    `- Timed captures per backend: ${report.iterations}`,
+    `- Warmup captures per backend: ${report.warmup}`,
+    '',
+    '| Backend | Captures | Total | Mean | Median | p95 | Min | Max | Avg bytes |',
+    '| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |'
+  ]
+
+  for (const backend of report.backends) {
+    const result = report.results[backend]
+
+    if (!result) continue
+
+    lines.push(
+      [
+        `| ${backend}`,
+        result.captures,
+        formatMs(result.totalMs),
+        formatMs(result.meanMs),
+        formatMs(result.medianMs),
+        formatMs(result.p95Ms),
+        formatMs(result.minMs),
+        formatMs(result.maxMs),
+        formatBytes(result.averageBytes)
+      ].join(' | ') + ' |'
+    )
+  }
+
+  lines.push('')
+
+  const means = report.backends
+    .map(backend => report.results[backend]?.meanMs)
+    .filter((value): value is number => typeof value === 'number')
+  const maxMean = Math.max(...means, 1)
+
+  lines.push(
+    'Relative mean latency, scaled to the slowest backend in this run:',
+    '',
+    '| Backend | Mean latency | Relative bar |',
+    '| --- | ---: | --- |'
+  )
+
+  for (const backend of report.backends) {
+    const result = report.results[backend]
+
+    if (!result) continue
+
+    lines.push(
+      `| ${backend} | ${formatMs(result.meanMs)} | \`${createBar(
+        result.meanMs,
+        maxMean
+      )}\` |`
+    )
+  }
+
+  lines.push('')
+
+  return `${lines.join('\n')}\n`
 }
 
 const loadNativeAddon = (addonPath: string): NativeV4l2Addon => {
@@ -155,11 +234,21 @@ const assertJpeg = (buffer: Buffer, backend: string) => {
 }
 
 const getOutputPath = (backend: CaptureBackend, index: number) =>
-  join(outputRoot, backend, `${backend}-${String(index).padStart(3, '0')}.jpg`)
+  join(
+    outputRoot,
+    backend,
+    index < 0
+      ? `${backend}-warmup-${String(Math.abs(index)).padStart(3, '0')}.jpg`
+      : `${backend}-${String(index).padStart(3, '0')}.jpg`
+  )
 
 const iterations = getNumberArg(
   'iterations',
   Number(process.env.NODE_WEBCAM_BENCHMARK_ITERATIONS || 100)
+)
+const warmup = getNumberArg(
+  'warmup',
+  Number(process.env.NODE_WEBCAM_BENCHMARK_WARMUP || 3)
 )
 const width = getNumberArg(
   'width',
@@ -265,7 +354,7 @@ const captures: Record<CaptureBackend, (index: number) => number> = {
 }
 
 console.log(
-  `Benchmarking ${iterations} captures for ${backends.join(
+  `Benchmarking ${iterations} captures and ${warmup} warmups for ${backends.join(
     ', '
   )} at ${width}x${height} on ${device}`
 )
@@ -277,6 +366,8 @@ for (const backend of backends) {
   const bytes = []
 
   mkdirSync(join(outputRoot, backend), { recursive: true })
+
+  for (let index = 0; index < warmup; index += 1) captures[backend](-index - 1)
 
   for (let index = 0; index < iterations; index += 1) {
     const result = measure(() => captures[backend](index))
@@ -291,10 +382,12 @@ for (const backend of backends) {
 const report: BenchmarkReport = {
   backends,
   device,
+  generatedAt: new Date().toISOString(),
   height,
   iterations,
   outputRoot,
   results,
+  warmup,
   width
 }
 
@@ -305,6 +398,11 @@ writeFileSync(
 writeFileSync(
   join(root, 'tmp', 'benchmark-results.json'),
   `${JSON.stringify(report, null, 2)}\n`
+)
+writeFileSync(join(outputRoot, 'results.md'), toMarkdownTable(report))
+writeFileSync(
+  join(root, 'tmp', 'benchmark-results.md'),
+  toMarkdownTable(report)
 )
 
 console.log(JSON.stringify(report, null, 2))
