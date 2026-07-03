@@ -89,6 +89,10 @@ export { getMetricsReport, resetMetrics } from './metrics'
 export type NodeWebcamConfig = WebcamConfig
 export type { WebcamErrorCode } from './errors'
 export type {
+  WebcamCaptureSaveHandler,
+  WebcamCaptureSaveStrategy
+} from './types'
+export type {
   WebcamBackendType,
   WebcamCaptureMetrics,
   WebcamMetricsReport

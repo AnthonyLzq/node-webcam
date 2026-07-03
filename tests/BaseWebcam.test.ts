@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, rmSync } from 'node:fs'
 import { readFile, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, relative } from 'node:path'
@@ -623,6 +623,111 @@ describe('BaseWebcam', () => {
       assert.equal(result.location, path)
       assert.equal(result.mimeType, 'image/png')
       assert.equal(result.toBase64(), 'data:image/png;base64,AQID')
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
+  })
+
+  it('can skip file persistence for buffer-producing backends', async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'node-webcam-'))
+    const path = join(directory, 'native-photo.png')
+    const webcam = new BufferWebcam({ output: 'png', save: false })
+
+    try {
+      const result = await webcam.capture({ location: path })
+
+      assert.equal(result.location, path)
+      assert.deepEqual([...result.buffer], [1, 2, 3])
+      assert.equal(existsSync(path), false)
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
+  })
+
+  it('can skip file persistence for file-producing backends', async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'node-webcam-'))
+    const path = join(directory, 'photo.png')
+    const webcam = new FakeCaptureWebcam({
+      output: 'png',
+      save: false
+    })
+
+    try {
+      const result = await webcam.capture({ location: path })
+
+      assert.deepEqual([...result.buffer], [1])
+      assert.equal(existsSync(path), false)
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
+  })
+
+  it('supports custom capture persistence callbacks', async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'node-webcam-'))
+    const path = join(directory, 'native-photo.png')
+    const customPath = join(directory, 'custom-native-photo.png')
+    const webcam = new BufferWebcam({
+      output: 'png',
+      save: async (capturePath, buffer) => {
+        assert.equal(capturePath, path)
+        await writeFile(customPath, buffer)
+
+        return false
+      }
+    })
+
+    try {
+      const result = await webcam.capture({ location: path })
+
+      assert.deepEqual([...result.buffer], [1, 2, 3])
+      assert.equal(existsSync(path), false)
+      assert.deepEqual([...(await readFile(customPath))], [1, 2, 3])
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
+  })
+
+  it('can request default persistence from a custom save callback', async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'node-webcam-'))
+    const path = join(directory, 'native-photo.png')
+    let calls = 0
+    const webcam = new BufferWebcam({
+      output: 'png',
+      save: (_capturePath, buffer) => {
+        calls += 1
+        assert.deepEqual([...buffer], [1, 2, 3])
+
+        return true
+      }
+    })
+
+    try {
+      await webcam.capture({ location: path })
+
+      assert.equal(calls, 1)
+      assert.deepEqual([...(await readFile(path))], [1, 2, 3])
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
+  })
+
+  it('wraps capture persistence callback failures', async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'node-webcam-'))
+    const path = join(directory, 'native-photo.png')
+    const webcam = new BufferWebcam({
+      output: 'png',
+      save: () => {
+        throw new Error('custom save failed')
+      }
+    })
+
+    try {
+      await assert.rejects(() => webcam.capture({ location: path }), {
+        code: 'OUTPUT_WRITE_FAILED',
+        message: `Unable to persist captured output: ${path}`,
+        name: 'WebcamError'
+      })
+      assert.equal(existsSync(path), false)
     } finally {
       rmSync(directory, { recursive: true, force: true })
     }

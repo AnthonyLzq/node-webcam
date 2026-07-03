@@ -164,7 +164,7 @@ try {
     join(consumerDirectory, 'index.ts'),
     [
       "import { capture, create, getMetricsReport, listWebcams, type NodeWebcamConfig, type WebcamMetricsReport } from '@anthonylzq/node-webcam'",
-      "const options: Partial<NodeWebcamConfig> = { device: false, output: 'jpg', timeout: 1 }",
+      "const options: Partial<NodeWebcamConfig> = { device: false, output: 'jpg', save: false, timeout: 1 }",
       'const webcam = create(options)',
       'void webcam.listWebcams()',
       'void listWebcams()',
@@ -179,7 +179,7 @@ try {
     join(consumerDirectory, 'index.mts'),
     [
       "import { capture, create, getMetricsReport, listWebcams, type NodeWebcamConfig, type WebcamMetricsReport } from '@anthonylzq/node-webcam'",
-      "const options: Partial<NodeWebcamConfig> = { device: false, output: 'jpg', timeout: 1 }",
+      "const options: Partial<NodeWebcamConfig> = { device: false, output: 'jpg', save: async (_path, _buffer) => false, timeout: 1 }",
       'const webcam = create(options)',
       'void webcam.listWebcams()',
       'void listWebcams()',

@@ -1,6 +1,6 @@
 import { execFile } from 'child_process'
-import { readFile, writeFile } from 'fs/promises'
-import { basename, resolve } from 'path'
+import { readFile, rm, writeFile } from 'fs/promises'
+import { basename, extname, resolve } from 'path'
 import { promisify } from 'util'
 
 import {
@@ -18,6 +18,7 @@ const r = /(?<=\.)[^.]*$/
 const ALLOWED_FILE_TYPES = ['jpg', 'jpeg', 'png', 'bmp']
 const captureQueues = new Map<string, Promise<void>>()
 let diagnosticCounter = 0
+let temporaryCaptureCounter = 0
 
 export type WebcamCommand = {
   file: string
@@ -95,6 +96,19 @@ const runQueued = async <T>(keys: string[], task: () => Promise<T>) => {
   }
 
   return runNext(0)
+}
+
+const createTemporaryCapturePath = (path: string) => {
+  const extension = extname(path)
+  const pathWithoutExtension = extension
+    ? path.slice(0, -extension.length)
+    : path
+
+  temporaryCaptureCounter += 1
+
+  return `${pathWithoutExtension}.node-webcam-${
+    process.pid
+  }-${Date.now()}-${temporaryCaptureCounter}${extension}`
 }
 
 class BaseWebcam {
@@ -257,6 +271,30 @@ class BaseWebcam {
     }
   }
 
+  private shouldUseTemporaryCapturePath() {
+    // CLI-style backends must write somewhere before BaseWebcam can read the
+    // buffer. When persistence is disabled or customized, write to a temporary
+    // path first so the requested `location` is not created unless `save` asks
+    // for it.
+    return this.#options.save !== true
+  }
+
+  private async persistCaptureOutput(path: string, buffer: Buffer) {
+    const { save } = this.#options
+
+    if (save === false) return
+
+    if (save === true) {
+      await writeFile(path, buffer)
+
+      return
+    }
+
+    const result = await save(path, buffer)
+
+    if (result === true) await writeFile(path, buffer)
+  }
+
   async capture({
     location
   }: WebcamCaptureOptions): Promise<WebcamCaptureResult> {
@@ -314,22 +352,33 @@ class BaseWebcam {
 
     const queuedAt = Date.now()
 
-    return runQueued(this.getCaptureQueueKeys(path), async () =>
-      this.runCapture(path, Date.now() - queuedAt)
-    )
+    return runQueued(this.getCaptureQueueKeys(path), async () => {
+      const executionPath = this.shouldUseTemporaryCapturePath()
+        ? createTemporaryCapturePath(path)
+        : path
+
+      return this.runCapture(path, executionPath, Date.now() - queuedAt)
+    })
   }
 
-  private async runCapture(path: string, queueWaitMs: number) {
+  private async runCapture(
+    path: string,
+    executionPath: string,
+    queueWaitMs: number
+  ) {
     const operationId = this.createDiagnosticId('capture')
     const startedAt = Date.now()
-    const execution = this.createCaptureExecution(path)
+    const execution = this.createCaptureExecution(executionPath)
     const backend = this.getBackendName()
     const backendType = this.getBackendType()
+    const temporaryCapturePath =
+      executionPath !== path ? executionPath : undefined
     const diagnosticDetails = execution.details ?? {}
     const diagnosticBase: Record<string, unknown> = {
       ...diagnosticDetails,
       backend,
       backendType,
+      executionPath,
       operationId,
       path,
       queueWaitMs,
@@ -389,6 +438,8 @@ class BaseWebcam {
         'error'
       )
 
+      if (temporaryCapturePath) await rm(temporaryCapturePath, { force: true })
+
       throw typedError
     }
 
@@ -396,10 +447,8 @@ class BaseWebcam {
     let mimeType = capture.mimeType ?? this.getCaptureMimeType()
 
     try {
-      if (capture.kind === 'buffer') {
-        buffer = Buffer.from(capture.buffer)
-        await writeFile(path, buffer)
-      } else {
+      if (capture.kind === 'buffer') buffer = Buffer.from(capture.buffer)
+      else {
         buffer = await readFile(capture.path)
         mimeType = capture.mimeType ?? this.getCaptureMimeType()
       }
@@ -436,7 +485,49 @@ class BaseWebcam {
         'error'
       )
 
+      if (temporaryCapturePath) await rm(temporaryCapturePath, { force: true })
+
       throw typedError
+    }
+
+    try {
+      await this.persistCaptureOutput(path, buffer)
+    } catch (error) {
+      const elapsedMs = this.getElapsedMs(startedAt)
+      const typedError = new WebcamError({
+        code: 'OUTPUT_WRITE_FAILED',
+        message: `Unable to persist captured output: ${path}`,
+        cause: error,
+        details: {
+          elapsedMs,
+          operationId,
+          path
+        }
+      })
+
+      recordCaptureMetric({
+        backend,
+        backendType,
+        bytes: 0,
+        code: 'OUTPUT_WRITE_FAILED',
+        elapsedMs,
+        queueWaitMs,
+        status: 'failed'
+      })
+
+      this.logDiagnostic(
+        'capture:error',
+        {
+          ...diagnosticBase,
+          code: 'OUTPUT_WRITE_FAILED',
+          elapsedMs
+        },
+        'error'
+      )
+
+      throw typedError
+    } finally {
+      if (temporaryCapturePath) await rm(temporaryCapturePath, { force: true })
     }
 
     if (this.#options.saveShots) this.#shots.push(this.createShot(path, buffer))

@@ -79,6 +79,35 @@ cannot complete.
 
   This is because in order to build the captured image correctly the file extension and output type must match.
 
+- If you only need the returned buffer and want to skip file persistence, set `save` to `false`:
+
+  ```ts
+  import { capture } from '@anthonylzq/node-webcam'
+
+  const result = await capture({
+    location: 'picture.jpeg',
+    options: {
+      save: false
+    }
+  })
+
+  console.log(result.buffer)
+  ```
+
+  You can also provide a custom save handler:
+
+  ```ts
+  await capture({
+    location: 'picture.jpeg',
+    options: {
+      save: async (path, buffer) => {
+        await uploadSomewhere(path, buffer)
+        return false
+      }
+    }
+  })
+  ```
+
 - In case you need something more advance you can use the `create` function that will give you a class that will handle the usage of the webcam for you.
 
   ```ts
@@ -110,6 +139,7 @@ cannot complete.
    *   title: '',
    *   subtitle: '',
    *   timestamp: '',
+   *   save: true,
    *   saveShots: true,
    *   output: 'jpeg',
    *   device: '',

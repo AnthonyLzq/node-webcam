@@ -8,6 +8,7 @@ const defaults: WebcamConfig = {
   title: '',
   subtitle: '',
   timestamp: '',
+  save: true,
   saveShots: true,
   output: 'jpeg',
   device: '',

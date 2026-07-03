@@ -1,3 +1,18 @@
+export type WebcamCaptureSaveHandler = (
+  path: string,
+  buffer: Buffer
+) => boolean | Promise<boolean | void> | void
+
+/**
+ * Controls whether capture output is persisted to `location`.
+ *
+ * - `true`: write the captured buffer to `location` before resolving.
+ * - `false`: skip file persistence and only return the buffer in the result.
+ * - function: run custom persistence logic with `(path, buffer)`.
+ *   Return `true` to also run the default write; return `false`/`void` to skip it.
+ */
+export type WebcamCaptureSaveStrategy = boolean | WebcamCaptureSaveHandler
+
 export type WebcamConfig = {
   // Picture related
   width: number // 1280
@@ -16,8 +31,11 @@ export type WebcamConfig = {
   // Timestamp of the saved picture
   timestamp: string // ''
 
-  // Save shots in memory
+  // Keep captured buffers in the in-memory shot history.
   saveShots: boolean // true
+
+  // Persist captured output to the requested location.
+  save: WebcamCaptureSaveStrategy // true
 
   // [jpeg png] support varies
   // Webcam.OutputTypes
