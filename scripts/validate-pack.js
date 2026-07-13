@@ -60,6 +60,9 @@ try {
   const nativePrebuildEntries = packageEntries.filter(entry =>
     /^prebuilds\/linux-[^/]+\/.+\.node$/.test(entry)
   )
+  const untaggedLinuxPrebuildEntries = nativePrebuildEntries.filter(
+    entry => !/\.(?:glibc|musl)\.node$/.test(entry)
+  )
 
   if (forbiddenEntries.length > 0)
     throw new Error(
@@ -73,6 +76,13 @@ try {
 
   if (nativePrebuildEntries.length === 0)
     throw new Error('Required Linux native prebuild missing from package tarball')
+
+  if (untaggedLinuxPrebuildEntries.length > 0)
+    throw new Error(
+      `Linux native prebuilds must include a libc tag: ${untaggedLinuxPrebuildEntries.join(
+        ', '
+      )}`
+    )
 
   consumerDirectory = mkdtempSync(join(tmpdir(), 'node-webcam-consumer-'))
 
