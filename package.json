@@ -8,7 +8,7 @@
     "node": ">=20.9.0"
   },
   "scripts": {
-    "build": "npm run rm:dist && npm run build:cjs && npm run build:esm && npm run build:types && node scripts/prepare-esm.js && node scripts/copy-bindings.js",
+    "build": "npm run rm:dist && npm run build:cjs && npm run build:esm && npm run build:types && node scripts/prepare-esm.js",
     "build:cjs": "tsc -p tsconfig.cjs.json",
     "build:esm": "tsc -p tsconfig.esm.json",
     "build:types": "tsc -p tsconfig.types.json",

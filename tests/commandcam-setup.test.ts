@@ -99,15 +99,12 @@ describe('CommandCam setup', () => {
     }
   })
 
-  it('writes verified CommandCam downloads to all build targets', async () => {
+  it('writes verified CommandCam downloads to target files', async () => {
     const directory = mkdtempSync(
       join(tmpdir(), 'node-webcam-commandcam-setup-')
     )
     const buffer = Buffer.alloc(1_024, 1)
-    const targetFiles = [
-      join(directory, 'dist/cjs/bindings/CommandCam/CommandCam.exe'),
-      join(directory, 'dist/esm/bindings/CommandCam/CommandCam.exe')
-    ]
+    const targetFiles = [join(directory, 'CommandCam.exe')]
 
     try {
       const result = await setup.installCommandCam({
@@ -127,7 +124,6 @@ describe('CommandCam setup', () => {
 
       assert.equal(result.status, 'installed')
       assert.deepEqual(readFileSync(targetFiles[0]), buffer)
-      assert.deepEqual(readFileSync(targetFiles[1]), buffer)
     } finally {
       rmSync(directory, { force: true, recursive: true })
     }

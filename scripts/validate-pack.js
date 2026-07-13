@@ -56,6 +56,9 @@ try {
   const forbiddenEntries = packageEntries.filter(entry =>
     forbiddenPackageEntries.test(entry)
   )
+  const legacyCommandCamEntries = packageEntries.filter(entry =>
+    /^dist\/(?:cjs|esm)\/bindings\/CommandCam\//.test(entry)
+  )
   const missingEntries = requiredPackageEntries.filter(
     entry => !packageEntries.includes(entry)
   )
@@ -69,6 +72,13 @@ try {
   if (forbiddenEntries.length > 0)
     throw new Error(
       `Unexpected entries in package tarball: ${forbiddenEntries.join(', ')}`
+    )
+
+  if (legacyCommandCamEntries.length > 0)
+    throw new Error(
+      `Unexpected legacy CommandCam bindings in package tarball: ${legacyCommandCamEntries.join(
+        ', '
+      )}`
     )
 
   if (missingEntries.length > 0)

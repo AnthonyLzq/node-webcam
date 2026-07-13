@@ -1,6 +1,6 @@
 import os from 'os'
 import { existsSync } from 'fs'
-import { join, resolve } from 'path'
+import { join } from 'path'
 
 import { WebcamError } from '../errors'
 
@@ -27,9 +27,6 @@ const getCommandCamCachePath = (
   } = {}
 ) => join(getCommandCamBaseDirectory(options), 'CommandCam.exe')
 
-const getPackagedCommandCamPath = () =>
-  resolve(__dirname, '..', 'bindings', 'CommandCam', 'CommandCam.exe')
-
 const resolveCommandCamPath = ({
   env = process.env,
   homedir = os.homedir()
@@ -39,8 +36,7 @@ const resolveCommandCamPath = ({
 } = {}) => {
   const candidates = [
     env.NODE_WEBCAM_COMMANDCAM_PATH,
-    getCommandCamCachePath({ env, homedir }),
-    getPackagedCommandCamPath()
+    getCommandCamCachePath({ env, homedir })
   ].filter((candidate): candidate is string => Boolean(candidate))
   const commandCamPath = candidates.find(candidate => existsSync(candidate))
 
@@ -59,6 +55,5 @@ const resolveCommandCamPath = ({
 export {
   getCommandCamBaseDirectory,
   getCommandCamCachePath,
-  getPackagedCommandCamPath,
   resolveCommandCamPath
 }
