@@ -8,7 +8,7 @@
     "node": ">=22"
   },
   "scripts": {
-    "build": "npm run rm:dist && npm run build:cjs && npm run build:esm && npm run build:types && node scripts/prepare-esm.js && cp -r src/bindings dist/cjs && cp -r src/bindings dist/esm",
+    "build": "npm run rm:dist && npm run build:cjs && npm run build:esm && npm run build:types && node scripts/prepare-esm.js && node scripts/copy-bindings.js",
     "build:cjs": "tsc -p tsconfig.cjs.json",
     "build:esm": "tsc -p tsconfig.esm.json",
     "build:types": "tsc -p tsconfig.types.json",
@@ -29,7 +29,7 @@
     "test": "node --test -r ts-node/register \"tests/**/*.test.ts\"",
     "release": "standard-version",
     "version": "npm run release && git add .",
-    "rm:dist": "if [ -d \"dist\" ]; then rm -rf dist; fi"
+    "rm:dist": "node scripts/clean-dist.js"
   },
   "repository": {
     "type": "git",
