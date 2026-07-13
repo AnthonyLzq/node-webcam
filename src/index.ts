@@ -9,7 +9,7 @@ import {
   NativeLinuxWebcam,
   WindowsWebcam
 } from './webcams'
-import { getPlatformCameras } from './utils'
+import { getPlatformCameras, setDefaults } from './utils'
 import type { WebcamCaptureResult } from './webcams/BaseWebcam'
 import type { WebcamConfig } from './types'
 
@@ -65,39 +65,40 @@ const canUseFFmpegBackend = (options: Partial<WebcamConfig>) =>
   !hasLegacyOnlyOptions(options)
 
 const create = (options: Partial<WebcamConfig> = {}): BaseWebcam => {
+  const config = setDefaults(options)
   const currentPlatform = os.platform()
 
   switch (currentPlatform) {
     case 'linux':
       if (
-        canUseNativeLinuxBackend(options) &&
-        NativeLinuxWebcam.isAvailable(options)
+        canUseNativeLinuxBackend(config) &&
+        NativeLinuxWebcam.isAvailable(config)
       )
-        return new NativeLinuxWebcam(options)
+        return new NativeLinuxWebcam(config)
 
       if (
-        canUseFFmpegBackend(options) &&
-        FFmpegWebcam.isAvailable(options, currentPlatform)
+        canUseFFmpegBackend(config) &&
+        FFmpegWebcam.isAvailable(config, currentPlatform)
       )
-        return new FFmpegWebcam(options, currentPlatform)
+        return new FFmpegWebcam(config, currentPlatform)
 
-      return new FSWebcam(options)
+      return new FSWebcam(config)
     case 'darwin':
       if (
-        canUseFFmpegBackend(options) &&
-        FFmpegWebcam.isAvailable(options, currentPlatform)
+        canUseFFmpegBackend(config) &&
+        FFmpegWebcam.isAvailable(config, currentPlatform)
       )
-        return new FFmpegWebcam(options, currentPlatform)
+        return new FFmpegWebcam(config, currentPlatform)
 
-      return new ImageSnapWebcam(options)
+      return new ImageSnapWebcam(config)
     case 'win32':
       if (
-        canUseFFmpegBackend(options) &&
-        FFmpegWebcam.isAvailable(options, currentPlatform)
+        canUseFFmpegBackend(config) &&
+        FFmpegWebcam.isAvailable(config, currentPlatform)
       )
-        return new FFmpegWebcam(options, currentPlatform)
+        return new FFmpegWebcam(config, currentPlatform)
 
-      return new WindowsWebcam(options)
+      return new WindowsWebcam(config)
     default:
       throw new WebcamError({
         code: 'UNSUPPORTED_WEBCAM_TYPE',

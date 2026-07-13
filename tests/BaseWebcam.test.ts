@@ -169,6 +169,35 @@ describe('BaseWebcam', () => {
     assert.equal(webcam.options.width, 640)
   })
 
+  it('rejects invalid runtime configuration values', () => {
+    const cases: Array<
+      [string, Partial<ConstructorParameters<typeof BaseWebcam>[0]>]
+    > = [
+      ['width', { width: 0 }],
+      ['height', { height: Number.NaN }],
+      ['frames', { frames: 0 }],
+      ['delay', { delay: -1 }],
+      ['quality', { quality: 101 }],
+      ['rotation', { rotation: 361 }],
+      ['skip', { skip: -1 }],
+      ['saveShots', { saveShots: 'yes' as unknown as boolean }],
+      ['output', { output: 'gif' as unknown as 'jpeg' }],
+      ['device', { device: true as unknown as string }],
+      ['save', { save: 'yes' as unknown as true }],
+      ['ffmpegPath', { ffmpegPath: false as unknown as string }]
+    ]
+
+    for (const [option, config] of cases)
+      assert.throws(
+        () => new BaseWebcam(config),
+        {
+          code: 'INVALID_CONFIG_OPTION',
+          name: 'WebcamError'
+        },
+        option
+      )
+  })
+
   it('rejects paths without an extension before executing commands', async () => {
     const webcam = new BaseWebcam({})
 
@@ -296,12 +325,9 @@ describe('BaseWebcam', () => {
     }
   })
 
-  it('rejects invalid capture timeouts before executing commands', async () => {
-    const webcam = new BaseWebcam({ output: 'png', timeout: -1 })
-
-    await assert.rejects(() => webcam.capture({ location: 'photo.png' }), {
-      code: 'INVALID_TIMEOUT',
-      message: 'Invalid timeout: -1',
+  it('rejects invalid capture timeouts before execution', () => {
+    assert.throws(() => new BaseWebcam({ output: 'png', timeout: -1 }), {
+      code: 'INVALID_CONFIG_OPTION',
       name: 'WebcamError'
     })
   })

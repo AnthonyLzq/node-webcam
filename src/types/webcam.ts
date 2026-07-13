@@ -68,8 +68,8 @@ export type WebcamConfig = {
   rotation: number // 0
 
   // Banners
-  topBanner: false
-  bottomBanner: false
+  topBanner: boolean
+  bottomBanner: boolean
 
   // Skip
   skip: number // 0
