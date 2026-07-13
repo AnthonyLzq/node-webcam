@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import os, { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { delimiter, join } from 'node:path'
 import { describe, it, mock } from 'node:test'
 
 import { list, listWebcams } from '../src'
@@ -17,27 +17,47 @@ import {
 import { BaseWebcam } from '../src/webcams/BaseWebcam'
 
 const waitForeverScript = 'setTimeout(() => {}, 1000)'
+const isWindows = process.platform === 'win32'
+const posixIt = isWindows ? it.skip : it
 
 describe('camera listing', () => {
   it('returns an array from the deprecated async list API', async () => {
-    const cameras = await new BaseWebcam({}).list()
+    mock.method(os, 'platform', () => 'freebsd')
 
-    assert.ok(Array.isArray(cameras))
+    try {
+      const cameras = await new BaseWebcam({}).list()
+
+      assert.ok(Array.isArray(cameras))
+    } finally {
+      mock.restoreAll()
+    }
   })
 
   it('returns an array from the common async listWebcams API', async () => {
-    const cameras = await new BaseWebcam({}).listWebcams()
+    mock.method(os, 'platform', () => 'freebsd')
 
-    assert.ok(Array.isArray(cameras))
+    try {
+      const cameras = await new BaseWebcam({}).listWebcams()
+
+      assert.ok(Array.isArray(cameras))
+    } finally {
+      mock.restoreAll()
+    }
   })
 
   it('returns an array from the platform camera helper', async () => {
-    const cameras = await getCameras()
+    mock.method(os, 'platform', () => 'freebsd')
 
-    assert.ok(Array.isArray(cameras))
+    try {
+      const cameras = await getCameras()
+
+      assert.ok(Array.isArray(cameras))
+    } finally {
+      mock.restoreAll()
+    }
   })
 
-  it('returns Linux cameras from the platform-aware helper', async () => {
+  posixIt('returns Linux cameras from the platform-aware helper', async () => {
     const cameras = await getPlatformCameras({ platform: 'linux' })
 
     assert.ok(Array.isArray(cameras))
@@ -141,60 +161,66 @@ describe('camera listing', () => {
     )
   })
 
-  it('parses successful Windows CommandCam list output from stderr', async () => {
-    const directory = mkdtempSync(join(tmpdir(), 'node-webcam-commandcam-'))
-    const commandCam = join(directory, 'CommandCam')
+  posixIt(
+    'parses successful Windows CommandCam list output from stderr',
+    async () => {
+      const directory = mkdtempSync(join(tmpdir(), 'node-webcam-commandcam-'))
+      const commandCam = join(directory, 'CommandCam')
 
-    writeFileSync(
-      commandCam,
-      [
-        '#!/usr/bin/env node',
-        "process.stderr.write('Available capture devices:\\nIntegrated Webcam\\nUSB Camera\\n')"
-      ].join('\n')
-    )
-    chmodSync(commandCam, 0o755)
+      writeFileSync(
+        commandCam,
+        [
+          '#!/usr/bin/env node',
+          "process.stderr.write('Available capture devices:\\nIntegrated Webcam\\nUSB Camera\\n')"
+        ].join('\n')
+      )
+      chmodSync(commandCam, 0o755)
 
-    try {
-      const cameras = await getPlatformCameras({
-        platform: 'win32',
-        windowsCommandCamPath: commandCam
-      })
+      try {
+        const cameras = await getPlatformCameras({
+          platform: 'win32',
+          windowsCommandCamPath: commandCam
+        })
 
-      assert.deepEqual(cameras, ['Integrated Webcam', 'USB Camera'])
-    } finally {
-      rmSync(directory, { force: true, recursive: true })
+        assert.deepEqual(cameras, ['Integrated Webcam', 'USB Camera'])
+      } finally {
+        rmSync(directory, { force: true, recursive: true })
+      }
     }
-  })
+  )
 
-  it('uses the configured CommandCam path for Windows platform listing', async () => {
-    const directory = mkdtempSync(join(tmpdir(), 'node-webcam-commandcam-'))
-    const commandCam = join(directory, 'CommandCam')
-    const originalCommandCamPath = process.env.NODE_WEBCAM_COMMANDCAM_PATH
+  posixIt(
+    'uses the configured CommandCam path for Windows platform listing',
+    async () => {
+      const directory = mkdtempSync(join(tmpdir(), 'node-webcam-commandcam-'))
+      const commandCam = join(directory, 'CommandCam')
+      const originalCommandCamPath = process.env.NODE_WEBCAM_COMMANDCAM_PATH
 
-    writeFileSync(
-      commandCam,
-      [
-        '#!/usr/bin/env node',
-        "process.stderr.write('Available capture devices:\\nIntegrated Webcam\\n')"
-      ].join('\n')
-    )
-    chmodSync(commandCam, 0o755)
-    process.env.NODE_WEBCAM_COMMANDCAM_PATH = commandCam
+      writeFileSync(
+        commandCam,
+        [
+          '#!/usr/bin/env node',
+          "process.stderr.write('Available capture devices:\\nIntegrated Webcam\\n')"
+        ].join('\n')
+      )
+      chmodSync(commandCam, 0o755)
+      process.env.NODE_WEBCAM_COMMANDCAM_PATH = commandCam
 
-    try {
-      const cameras = await getPlatformCameras({ platform: 'win32' })
+      try {
+        const cameras = await getPlatformCameras({ platform: 'win32' })
 
-      assert.deepEqual(cameras, ['Integrated Webcam'])
-    } finally {
-      if (originalCommandCamPath === undefined)
-        delete process.env.NODE_WEBCAM_COMMANDCAM_PATH
-      else process.env.NODE_WEBCAM_COMMANDCAM_PATH = originalCommandCamPath
+        assert.deepEqual(cameras, ['Integrated Webcam'])
+      } finally {
+        if (originalCommandCamPath === undefined)
+          delete process.env.NODE_WEBCAM_COMMANDCAM_PATH
+        else process.env.NODE_WEBCAM_COMMANDCAM_PATH = originalCommandCamPath
 
-      rmSync(directory, { force: true, recursive: true })
+        rmSync(directory, { force: true, recursive: true })
+      }
     }
-  })
+  )
 
-  it('wraps timed out camera listing commands', async () => {
+  posixIt('wraps timed out camera listing commands', async () => {
     const directory = mkdtempSync(join(tmpdir(), 'node-webcam-imagesnap-'))
     const imagesnap = join(directory, 'imagesnap')
     const originalPath = process.env.PATH
@@ -204,7 +230,7 @@ describe('camera listing', () => {
       ['#!/usr/bin/env node', waitForeverScript].join('\n')
     )
     chmodSync(imagesnap, 0o755)
-    process.env.PATH = `${directory}:${originalPath}`
+    process.env.PATH = `${directory}${delimiter}${originalPath}`
 
     try {
       await assert.rejects(
@@ -221,7 +247,7 @@ describe('camera listing', () => {
     }
   })
 
-  it('wraps aborted camera listing commands', async () => {
+  posixIt('wraps aborted camera listing commands', async () => {
     const directory = mkdtempSync(join(tmpdir(), 'node-webcam-commandcam-'))
     const commandCam = join(directory, 'CommandCam')
     const controller = new AbortController()
@@ -253,7 +279,7 @@ describe('camera listing', () => {
     }
   })
 
-  it('passes instance timeout options to camera listing', async () => {
+  posixIt('passes instance timeout options to camera listing', async () => {
     const directory = mkdtempSync(join(tmpdir(), 'node-webcam-imagesnap-'))
     const imagesnap = join(directory, 'imagesnap')
     const originalPath = process.env.PATH
@@ -264,7 +290,7 @@ describe('camera listing', () => {
       ['#!/usr/bin/env node', waitForeverScript].join('\n')
     )
     chmodSync(imagesnap, 0o755)
-    process.env.PATH = `${directory}:${originalPath}`
+    process.env.PATH = `${directory}${delimiter}${originalPath}`
     mock.method(os, 'platform', () => 'darwin')
 
     try {
@@ -280,14 +306,26 @@ describe('camera listing', () => {
   })
 
   it('exposes top-level list as a deprecated async listing API', async () => {
-    const cameras = await list()
+    mock.method(os, 'platform', () => 'freebsd')
 
-    assert.ok(Array.isArray(cameras))
+    try {
+      const cameras = await list()
+
+      assert.ok(Array.isArray(cameras))
+    } finally {
+      mock.restoreAll()
+    }
   })
 
   it('exposes top-level listWebcams as the async listing API', async () => {
-    const cameras = await listWebcams()
+    mock.method(os, 'platform', () => 'freebsd')
 
-    assert.ok(Array.isArray(cameras))
+    try {
+      const cameras = await listWebcams()
+
+      assert.ok(Array.isArray(cameras))
+    } finally {
+      mock.restoreAll()
+    }
   })
 })

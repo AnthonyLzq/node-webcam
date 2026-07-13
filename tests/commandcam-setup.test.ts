@@ -75,14 +75,19 @@ describe('CommandCam setup', () => {
         env: { LOCALAPPDATA: 'C:\\Users\\me\\AppData\\Local' },
         homedir: 'C:\\Users\\me'
       }),
-      'C:\\Users\\me\\AppData\\Local/node-webcam/CommandCam/CommandCam.exe'
+      join(
+        'C:\\Users\\me\\AppData\\Local',
+        'node-webcam',
+        'CommandCam',
+        'CommandCam.exe'
+      )
     )
 
     assert.equal(
       setup.getCommandCamPath({
         env: { NODE_WEBCAM_COMMANDCAM_DIR: 'D:\\node-webcam' }
       }),
-      'D:\\node-webcam/CommandCam.exe'
+      join('D:\\node-webcam', 'CommandCam.exe')
     )
   })
 
