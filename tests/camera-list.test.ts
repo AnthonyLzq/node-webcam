@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict'
 import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import os, { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { describe, it } from 'node:test'
+import { describe, it, mock } from 'node:test'
 
 import { list, listWebcams } from '../src'
 import {
@@ -14,6 +14,8 @@ import {
   parseWindowsCameras
 } from '../src/utils'
 import { BaseWebcam } from '../src/webcams/BaseWebcam'
+
+const waitForeverScript = 'setTimeout(() => {}, 1000)'
 
 describe('camera listing', () => {
   it('returns an array from the deprecated async list API', async () => {
@@ -105,36 +107,121 @@ describe('camera listing', () => {
         windowsCommandCamPath: commandCam
       })
 
-      it('uses the configured CommandCam path for Windows platform listing', async () => {
-        const directory = mkdtempSync(join(tmpdir(), 'node-webcam-commandcam-'))
-        const commandCam = join(directory, 'CommandCam')
-        const originalCommandCamPath = process.env.NODE_WEBCAM_COMMANDCAM_PATH
-
-        writeFileSync(
-          commandCam,
-          [
-            '#!/usr/bin/env node',
-            "process.stderr.write('Available capture devices:\\nIntegrated Webcam\\n')"
-          ].join('\n')
-        )
-        chmodSync(commandCam, 0o755)
-        process.env.NODE_WEBCAM_COMMANDCAM_PATH = commandCam
-
-        try {
-          const cameras = await getPlatformCameras({ platform: 'win32' })
-
-          assert.deepEqual(cameras, ['Integrated Webcam'])
-        } finally {
-          if (originalCommandCamPath === undefined)
-            delete process.env.NODE_WEBCAM_COMMANDCAM_PATH
-          else process.env.NODE_WEBCAM_COMMANDCAM_PATH = originalCommandCamPath
-
-          rmSync(directory, { force: true, recursive: true })
-        }
-      })
-
       assert.deepEqual(cameras, ['Integrated Webcam', 'USB Camera'])
     } finally {
+      rmSync(directory, { force: true, recursive: true })
+    }
+  })
+
+  it('uses the configured CommandCam path for Windows platform listing', async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'node-webcam-commandcam-'))
+    const commandCam = join(directory, 'CommandCam')
+    const originalCommandCamPath = process.env.NODE_WEBCAM_COMMANDCAM_PATH
+
+    writeFileSync(
+      commandCam,
+      [
+        '#!/usr/bin/env node',
+        "process.stderr.write('Available capture devices:\\nIntegrated Webcam\\n')"
+      ].join('\n')
+    )
+    chmodSync(commandCam, 0o755)
+    process.env.NODE_WEBCAM_COMMANDCAM_PATH = commandCam
+
+    try {
+      const cameras = await getPlatformCameras({ platform: 'win32' })
+
+      assert.deepEqual(cameras, ['Integrated Webcam'])
+    } finally {
+      if (originalCommandCamPath === undefined)
+        delete process.env.NODE_WEBCAM_COMMANDCAM_PATH
+      else process.env.NODE_WEBCAM_COMMANDCAM_PATH = originalCommandCamPath
+
+      rmSync(directory, { force: true, recursive: true })
+    }
+  })
+
+  it('wraps timed out camera listing commands', async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'node-webcam-imagesnap-'))
+    const imagesnap = join(directory, 'imagesnap')
+    const originalPath = process.env.PATH
+
+    writeFileSync(
+      imagesnap,
+      ['#!/usr/bin/env node', waitForeverScript].join('\n')
+    )
+    chmodSync(imagesnap, 0o755)
+    process.env.PATH = `${directory}:${originalPath}`
+
+    try {
+      await assert.rejects(
+        () => getPlatformCameras({ platform: 'darwin', timeout: 10 }),
+        {
+          code: 'COMMAND_TIMEOUT',
+          message: 'Webcam command timed out after 10ms: imagesnap',
+          name: 'WebcamError'
+        }
+      )
+    } finally {
+      process.env.PATH = originalPath
+      rmSync(directory, { force: true, recursive: true })
+    }
+  })
+
+  it('wraps aborted camera listing commands', async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'node-webcam-commandcam-'))
+    const commandCam = join(directory, 'CommandCam')
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 10)
+
+    writeFileSync(
+      commandCam,
+      ['#!/usr/bin/env node', waitForeverScript].join('\n')
+    )
+    chmodSync(commandCam, 0o755)
+
+    try {
+      await assert.rejects(
+        () =>
+          getPlatformCameras({
+            platform: 'win32',
+            signal: controller.signal,
+            windowsCommandCamPath: commandCam
+          }),
+        {
+          code: 'COMMAND_ABORTED',
+          message: `Webcam command was aborted: ${commandCam}`,
+          name: 'WebcamError'
+        }
+      )
+    } finally {
+      clearTimeout(timer)
+      rmSync(directory, { force: true, recursive: true })
+    }
+  })
+
+  it('passes instance timeout options to camera listing', async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'node-webcam-imagesnap-'))
+    const imagesnap = join(directory, 'imagesnap')
+    const originalPath = process.env.PATH
+    const webcam = new BaseWebcam({ timeout: 10 })
+
+    writeFileSync(
+      imagesnap,
+      ['#!/usr/bin/env node', waitForeverScript].join('\n')
+    )
+    chmodSync(imagesnap, 0o755)
+    process.env.PATH = `${directory}:${originalPath}`
+    mock.method(os, 'platform', () => 'darwin')
+
+    try {
+      await assert.rejects(() => webcam.listWebcams(), {
+        code: 'COMMAND_TIMEOUT',
+        name: 'WebcamError'
+      })
+    } finally {
+      mock.restoreAll()
+      process.env.PATH = originalPath
       rmSync(directory, { force: true, recursive: true })
     }
   })

@@ -19,6 +19,8 @@ type CaptureRequest = {
   cb?: (value: WebcamCaptureResult) => void
 }
 
+type ListRequest = Pick<Partial<WebcamConfig>, 'signal' | 'timeout'>
+
 const supportedPlatforms = ['linux', 'darwin', 'win32']
 const legacyOnlyOptions: Array<[keyof WebcamConfig, unknown]> = [
   ['bottomBanner', false],
@@ -121,9 +123,10 @@ const capture = async ({ location, options = {}, cb }: CaptureRequest = {}) => {
   return result
 }
 
-const list = async () => getPlatformCameras()
+const list = async (options: ListRequest = {}) => getPlatformCameras(options)
 
-const listWebcams = async () => getPlatformCameras()
+const listWebcams = async (options: ListRequest = {}) =>
+  getPlatformCameras(options)
 
 export {
   create,

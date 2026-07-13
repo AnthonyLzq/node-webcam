@@ -3,7 +3,11 @@ import fs from 'fs'
 import os from 'os'
 import { promisify } from 'util'
 
-import { WebcamError, getCommandErrorCode } from '../errors'
+import {
+  WebcamError,
+  getCommandErrorCode,
+  getCommandErrorMessage
+} from '../errors'
 import { resolveCommandCamPath } from './commandCam'
 
 const asyncExecFile = promisify(execFile)
@@ -15,6 +19,8 @@ type CameraListCommand = {
 
 type GetCamerasOptions = {
   platform?: string
+  signal?: AbortSignal
+  timeout?: number
   windowsCommandCamPath?: string
 }
 
@@ -31,8 +37,8 @@ const getLinuxCameras = () => {
   return cameras
 }
 
-const getCameras = () => {
-  return getPlatformCameras()
+const getCameras = (options: GetCamerasOptions = {}) => {
+  return getPlatformCameras(options)
 }
 
 const getImageSnapListCommand = (): CameraListCommand => ({
@@ -75,30 +81,50 @@ const parseWindowsCameras = (stdout: string) => {
   }, [])
 }
 
-const runCameraListCommand = async ({ args, file }: CameraListCommand) => {
+const runCameraListCommand = async (
+  { args, file }: CameraListCommand,
+  { signal, timeout = 0 }: Pick<GetCamerasOptions, 'signal' | 'timeout'> = {}
+) => {
   try {
-    const result = await asyncExecFile(file, args)
+    const result = await asyncExecFile(file, args, {
+      signal,
+      timeout
+    })
 
     return result
   } catch (error) {
     if (error instanceof WebcamError) throw error
 
-    const code = getCommandErrorCode(error)
+    const code = getCommandErrorCode(error, { timeout })
+    const isCommandError =
+      code === 'BINARY_NOT_FOUND' ||
+      code === 'COMMAND_ABORTED' ||
+      code === 'COMMAND_TIMEOUT'
 
     throw new WebcamError({
-      code: code === 'BINARY_NOT_FOUND' ? code : 'CAMERA_LIST_FAILED',
-      message:
-        code === 'BINARY_NOT_FOUND'
-          ? `Webcam command binary was not found: ${file}`
-          : 'Unable to list webcams',
+      code: isCommandError ? code : 'CAMERA_LIST_FAILED',
+      message: isCommandError
+        ? getCommandErrorMessage({
+            code,
+            file,
+            timeout
+          })
+        : 'Unable to list webcams',
       cause: error,
-      details: { args, file }
+      details: {
+        args,
+        file,
+        signalAborted: signal?.aborted ?? false,
+        timeout
+      }
     })
   }
 }
 
 const getPlatformCameras = async ({
   platform = os.platform(),
+  signal,
+  timeout = 0,
   windowsCommandCamPath
 }: GetCamerasOptions = {}) => {
   switch (platform) {
@@ -106,7 +132,10 @@ const getPlatformCameras = async ({
       return getLinuxCameras()
     case 'darwin': {
       const command = getImageSnapListCommand()
-      const { stderr, stdout } = await runCameraListCommand(command)
+      const { stderr, stdout } = await runCameraListCommand(command, {
+        signal,
+        timeout
+      })
 
       if (stderr)
         throw new WebcamError({
@@ -122,7 +151,10 @@ const getPlatformCameras = async ({
       const command = windowsCommandCamPath
         ? getWindowsListCommand(windowsCommandCamPath)
         : getDefaultWindowsListCommand()
-      const { stderr, stdout } = await runCameraListCommand(command)
+      const { stderr, stdout } = await runCameraListCommand(command, {
+        signal,
+        timeout
+      })
 
       return parseWindowsCameras(stdout || stderr)
     }

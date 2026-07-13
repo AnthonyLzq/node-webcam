@@ -152,7 +152,10 @@ class BaseWebcam {
   }
 
   async listWebcams(): Promise<string[]> {
-    return getPlatformCameras()
+    return getPlatformCameras({
+      signal: this.#options.signal,
+      timeout: this.#options.timeout
+    })
   }
 
   async hasCamera(camera: string) {
