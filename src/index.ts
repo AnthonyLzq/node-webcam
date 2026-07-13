@@ -20,8 +20,16 @@ type CaptureRequest = {
 }
 
 type ListRequest = Pick<Partial<WebcamConfig>, 'signal' | 'timeout'>
+type Platform = 'darwin' | 'linux' | 'win32'
 
 const supportedPlatforms = ['linux', 'darwin', 'win32']
+type BackendSelection =
+  | 'ffmpeg'
+  | 'fswebcam'
+  | 'imagesnap'
+  | 'native-linux'
+  | 'windows'
+const backendSelectionCache = new Map<string, BackendSelection>()
 const legacyOnlyOptions: Array<[keyof WebcamConfig, unknown]> = [
   ['bottomBanner', false],
   ['delay', 0],
@@ -66,41 +74,83 @@ const canUseNativeLinuxBackend = (options: Partial<WebcamConfig>) => {
 const canUseFFmpegBackend = (options: Partial<WebcamConfig>) =>
   !hasLegacyOnlyOptions(options)
 
-const create = (options: Partial<WebcamConfig> = {}): BaseWebcam => {
-  const config = setDefaults(options)
-  const currentPlatform = os.platform()
+const getBackendSelectionCacheKey = (platform: string, config: WebcamConfig) =>
+  JSON.stringify({
+    bottomBanner: config.bottomBanner,
+    delay: config.delay,
+    device: config.device,
+    ffmpegPath: config.ffmpegPath,
+    frames: config.frames,
+    greyScale: config.greyScale,
+    height: config.height,
+    output: config.output,
+    platform,
+    quality: config.quality,
+    rotation: config.rotation,
+    signal: Boolean(config.signal),
+    skip: config.skip,
+    subtitle: config.subtitle,
+    timeout: config.timeout,
+    timestamp: config.timestamp,
+    title: config.title,
+    topBanner: config.topBanner,
+    width: config.width
+  })
 
+const instantiateBackend = (
+  backend: BackendSelection,
+  config: WebcamConfig,
+  platform: Platform
+): BaseWebcam => {
+  switch (backend) {
+    case 'native-linux':
+      return new NativeLinuxWebcam(config)
+    case 'ffmpeg':
+      return new FFmpegWebcam(config, platform)
+    case 'fswebcam':
+      return new FSWebcam(config)
+    case 'imagesnap':
+      return new ImageSnapWebcam(config)
+    case 'windows':
+      return new WindowsWebcam(config)
+  }
+}
+
+const selectBackend = (
+  config: WebcamConfig,
+  currentPlatform: Platform
+): BackendSelection => {
   switch (currentPlatform) {
     case 'linux':
       if (
         canUseNativeLinuxBackend(config) &&
         NativeLinuxWebcam.isAvailable(config)
       )
-        return new NativeLinuxWebcam(config)
+        return 'native-linux'
 
       if (
         canUseFFmpegBackend(config) &&
         FFmpegWebcam.isAvailable(config, currentPlatform)
       )
-        return new FFmpegWebcam(config, currentPlatform)
+        return 'ffmpeg'
 
-      return new FSWebcam(config)
+      return 'fswebcam'
     case 'darwin':
       if (
         canUseFFmpegBackend(config) &&
         FFmpegWebcam.isAvailable(config, currentPlatform)
       )
-        return new FFmpegWebcam(config, currentPlatform)
+        return 'ffmpeg'
 
-      return new ImageSnapWebcam(config)
+      return 'imagesnap'
     case 'win32':
       if (
         canUseFFmpegBackend(config) &&
         FFmpegWebcam.isAvailable(config, currentPlatform)
       )
-        return new FFmpegWebcam(config, currentPlatform)
+        return 'ffmpeg'
 
-      return new WindowsWebcam(config)
+      return 'windows'
     default:
       throw new WebcamError({
         code: 'UNSUPPORTED_WEBCAM_TYPE',
@@ -112,6 +162,39 @@ const create = (options: Partial<WebcamConfig> = {}): BaseWebcam => {
       })
   }
 }
+
+const create = (options: Partial<WebcamConfig> = {}): BaseWebcam => {
+  const config = setDefaults(options)
+  const currentPlatform = os.platform()
+
+  if (
+    currentPlatform !== 'linux' &&
+    currentPlatform !== 'darwin' &&
+    currentPlatform !== 'win32'
+  )
+    throw new WebcamError({
+      code: 'UNSUPPORTED_WEBCAM_TYPE',
+      message: 'Webcam type is not supported',
+      details: {
+        requestedType: currentPlatform,
+        supportedTypes: supportedPlatforms
+      }
+    })
+
+  const cacheKey = getBackendSelectionCacheKey(currentPlatform, config)
+  const cachedSelection = backendSelectionCache.get(cacheKey)
+
+  if (cachedSelection)
+    return instantiateBackend(cachedSelection, config, currentPlatform)
+
+  const backend = selectBackend(config, currentPlatform)
+
+  backendSelectionCache.set(cacheKey, backend)
+
+  return instantiateBackend(backend, config, currentPlatform)
+}
+
+const clearBackendSelectionCache = () => backendSelectionCache.clear()
 
 const capture = async ({ location, options = {}, cb }: CaptureRequest = {}) => {
   const Webcam = create(options)
@@ -130,6 +213,7 @@ const listWebcams = async (options: ListRequest = {}) =>
 
 export {
   create,
+  clearBackendSelectionCache,
   capture,
   list,
   listWebcams,

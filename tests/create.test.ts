@@ -6,6 +6,7 @@ import { afterEach, describe, it, mock } from 'node:test'
 
 import {
   capture,
+  clearBackendSelectionCache,
   create,
   FSWebcam,
   ImageSnapWebcam,
@@ -60,6 +61,7 @@ const createCommandCamFixture = () => {
 
 describe('create', () => {
   afterEach(() => {
+    clearBackendSelectionCache()
     mock.restoreAll()
     delete process.env.NODE_WEBCAM_COMMANDCAM_PATH
   })
@@ -107,6 +109,46 @@ describe('create', () => {
     })
 
     assert.ok(webcam instanceof FFmpegWebcam)
+  })
+
+  it('caches backend selection without reusing backend instances', async () => {
+    mock.method(os, 'platform', () => 'linux')
+    mock.method(NativeLinuxWebcam, 'isAvailable', () => false)
+    const ffmpegAvailability = mock.method(
+      FFmpegWebcam,
+      'isAvailable',
+      () => true
+    )
+    const calls: string[][] = []
+
+    mock.method(
+      FFmpegWebcam.prototype,
+      'capture',
+      async function (this: FFmpegWebcam, { location }: { location: string }) {
+        calls.push([location, String(this instanceof FFmpegWebcam)])
+
+        return {
+          backend: 'ffmpeg:v4l2',
+          backendType: 'ffmpeg',
+          buffer: Buffer.from([]),
+          bytes: 0,
+          elapsedMs: 0,
+          location,
+          mimeType: 'image/jpeg',
+          queueWaitMs: 0,
+          toBase64: () => ''
+        }
+      }
+    )
+
+    await capture({ location: 'first.jpeg' })
+    await capture({ location: 'second.jpeg' })
+
+    assert.equal(ffmpegAvailability.mock.callCount(), 1)
+    assert.deepEqual(calls, [
+      ['first.jpeg', 'true'],
+      ['second.jpeg', 'true']
+    ])
   })
 
   it('reports the native Linux backend as available when its addon is available', () => {
