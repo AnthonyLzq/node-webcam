@@ -14,6 +14,24 @@ Cross platform webcam usage
 | macOS | None yet | `ffmpeg`, then `imagesnap` | Camera permissions are controlled by macOS and may require granting access to the terminal/app running Node.js. |
 | Windows | None yet | `ffmpeg` with an explicit DirectShow `device`, then `CommandCam.exe` via setup | Run `npx @anthonylzq/node-webcam setup windows` for CommandCam fallback, or set `NODE_WEBCAM_COMMANDCAM_PATH`. |
 
+### Versioning and migration from 2.x
+
+Version `3.0.0` is a semver-major release line. It intentionally does not
+publish the new capture API as `2.x` because several public APIs changed:
+
+| 2.x behavior | 3.x replacement |
+| --- | --- |
+| `Factory` root export | Use `create(options)` from the package root. |
+| `create(options, type)` platform/backend override | Use `create(options)`; backend selection is automatic and capability-aware. |
+| `capture({ type, returnType })` or `responseType` | Use `capture({ location, options })`; it always resolves to `WebcamCaptureResult`. |
+| Buffer/base64 response modes | Use `result.buffer` or `result.toBase64()`. |
+| `list(type)` platform override | Use `listWebcams({ timeout, signal })` or `list()` for the current platform. |
+| Deep imports from `dist/*` | Import only from `@anthonylzq/node-webcam`. |
+
+The explicit root-only `exports` map is part of the 3.x contract. Backend
+implementations, native bindings, and build output paths are internal and may
+change without being exposed as supported subpaths.
+
 ### Linux
 
 Linux uses the bundled native V4L2 addon when a matching prebuild is available,

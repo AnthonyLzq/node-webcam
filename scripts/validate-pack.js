@@ -68,6 +68,10 @@ try {
   const untaggedLinuxPrebuildEntries = nativePrebuildEntries.filter(
     entry => !/\.(?:glibc|musl)\.node$/.test(entry)
   )
+  const packageMajorVersion = Number.parseInt(
+    String(packageJson.version).split('.')[0],
+    10
+  )
 
   if (forbiddenEntries.length > 0)
     throw new Error(
@@ -88,6 +92,11 @@ try {
 
   if (nativePrebuildEntries.length === 0)
     throw new Error('Required Linux native prebuild missing from package tarball')
+
+  if (!Number.isFinite(packageMajorVersion) || packageMajorVersion < 3)
+    throw new Error(
+      `Breaking API changes must be published as a major version >= 3, received ${packageJson.version}`
+    )
 
   if (JSON.stringify(Object.keys(packageJson.exports ?? {})) !== JSON.stringify(['.']))
     throw new Error('Package exports must remain root-only until public subpaths are approved')
