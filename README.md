@@ -4,6 +4,16 @@ Cross platform webcam usage
 
 ## Install
 
+### Requirements
+
+- Node.js `>=22`.
+
+| Platform | Built-in/native path | Optional fallback requirements | Notes |
+| --- | --- | --- | --- |
+| Linux | Bundled native V4L2 prebuild for `linux-x64` | `ffmpeg`, then `fswebcam` | Other Linux architectures/libc variants fall back when no matching native prebuild exists. |
+| macOS | None yet | `ffmpeg`, then `imagesnap` | Camera permissions are controlled by macOS and may require granting access to the terminal/app running Node.js. |
+| Windows | None yet | `ffmpeg` with an explicit DirectShow `device`, then `CommandCam.exe` via setup | Run `npx @anthonylzq/node-webcam setup windows` for CommandCam fallback, or set `NODE_WEBCAM_COMMANDCAM_PATH`. |
+
 ### Linux
 
 Linux uses the bundled native V4L2 addon when a matching prebuild is available,
