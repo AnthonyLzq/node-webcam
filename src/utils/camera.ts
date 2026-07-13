@@ -1,10 +1,10 @@
 import { execFile } from 'child_process'
 import fs from 'fs'
 import os from 'os'
-import { resolve } from 'path'
 import { promisify } from 'util'
 
 import { WebcamError, getCommandErrorCode } from '../errors'
+import { resolveCommandCamPath } from './commandCam'
 
 const asyncExecFile = promisify(execFile)
 
@@ -46,9 +46,7 @@ const getWindowsListCommand = (file: string): CameraListCommand => ({
 })
 
 const getDefaultWindowsListCommand = () =>
-  getWindowsListCommand(
-    resolve(__dirname, '..', 'bindings', 'CommandCam', 'CommandCam.exe')
-  )
+  getWindowsListCommand(resolveCommandCamPath())
 
 const parseImageSnapCameras = (stdout: string) => {
   const lines = stdout.split('\n')

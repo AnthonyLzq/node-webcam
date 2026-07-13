@@ -18,8 +18,7 @@ const nativeAddonFile = ['build', 'Release', 'node_webcam_native.node']
 const requireFromNative = createRequire(resolve(__dirname, 'native.js'))
 const defaultNativePackageRoots = [
   resolve(__dirname, '..', '..'),
-  resolve(__dirname, '..'),
-  process.cwd()
+  resolve(__dirname, '..')
 ]
 const defaultNativeAddonPaths = [
   resolve(__dirname, '..', ...nativeAddonFile),

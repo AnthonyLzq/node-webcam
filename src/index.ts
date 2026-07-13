@@ -20,26 +20,81 @@ type CaptureRequest = {
 }
 
 const supportedPlatforms = ['linux', 'darwin', 'win32']
+const legacyOnlyOptions: Array<[keyof WebcamConfig, unknown]> = [
+  ['bottomBanner', false],
+  ['delay', 0],
+  ['frames', 1],
+  ['greyScale', false],
+  ['quality', 100],
+  ['rotation', 0],
+  ['skip', 0],
+  ['subtitle', ''],
+  ['timestamp', ''],
+  ['title', ''],
+  ['topBanner', false]
+]
+
+const hasOwn = (options: Partial<WebcamConfig>, option: keyof WebcamConfig) =>
+  Object.prototype.hasOwnProperty.call(options, option)
+
+const hasRequestedNonDefaultOption = (
+  options: Partial<WebcamConfig>,
+  option: keyof WebcamConfig,
+  defaultValue: unknown
+) => {
+  if (!hasOwn(options, option)) return false
+
+  return (options as Record<string, unknown>)[option] !== defaultValue
+}
+
+const hasLegacyOnlyOptions = (options: Partial<WebcamConfig>) =>
+  legacyOnlyOptions.some(([option, defaultValue]) =>
+    hasRequestedNonDefaultOption(options, option, defaultValue)
+  )
+
+const canUseNativeLinuxBackend = (options: Partial<WebcamConfig>) => {
+  if (hasLegacyOnlyOptions(options)) return false
+  if (hasRequestedNonDefaultOption(options, 'ffmpegPath', undefined))
+    return false
+  if (hasRequestedNonDefaultOption(options, 'signal', undefined)) return false
+
+  return true
+}
+
+const canUseFFmpegBackend = (options: Partial<WebcamConfig>) =>
+  !hasLegacyOnlyOptions(options)
 
 const create = (options: Partial<WebcamConfig> = {}): BaseWebcam => {
   const currentPlatform = os.platform()
 
   switch (currentPlatform) {
     case 'linux':
-      if (NativeLinuxWebcam.isAvailable(options))
+      if (
+        canUseNativeLinuxBackend(options) &&
+        NativeLinuxWebcam.isAvailable(options)
+      )
         return new NativeLinuxWebcam(options)
 
-      if (FFmpegWebcam.isAvailable(options, currentPlatform))
+      if (
+        canUseFFmpegBackend(options) &&
+        FFmpegWebcam.isAvailable(options, currentPlatform)
+      )
         return new FFmpegWebcam(options, currentPlatform)
 
       return new FSWebcam(options)
     case 'darwin':
-      if (FFmpegWebcam.isAvailable(options, currentPlatform))
+      if (
+        canUseFFmpegBackend(options) &&
+        FFmpegWebcam.isAvailable(options, currentPlatform)
+      )
         return new FFmpegWebcam(options, currentPlatform)
 
       return new ImageSnapWebcam(options)
     case 'win32':
-      if (FFmpegWebcam.isAvailable(options, currentPlatform))
+      if (
+        canUseFFmpegBackend(options) &&
+        FFmpegWebcam.isAvailable(options, currentPlatform)
+      )
         return new FFmpegWebcam(options, currentPlatform)
 
       return new WindowsWebcam(options)
@@ -55,13 +110,10 @@ const create = (options: Partial<WebcamConfig> = {}): BaseWebcam => {
   }
 }
 
-const capture = async ({
-  location = 'location.jpeg',
-  options = {},
-  cb
-}: CaptureRequest = {}) => {
+const capture = async ({ location, options = {}, cb }: CaptureRequest = {}) => {
   const Webcam = create(options)
-  const result = await Webcam.capture({ location })
+  const captureLocation = location ?? `location.${Webcam.options.output}`
+  const result = await Webcam.capture({ location: captureLocation })
 
   if (cb) cb(result)
 

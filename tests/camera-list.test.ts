@@ -105,6 +105,34 @@ describe('camera listing', () => {
         windowsCommandCamPath: commandCam
       })
 
+      it('uses the configured CommandCam path for Windows platform listing', async () => {
+        const directory = mkdtempSync(join(tmpdir(), 'node-webcam-commandcam-'))
+        const commandCam = join(directory, 'CommandCam')
+        const originalCommandCamPath = process.env.NODE_WEBCAM_COMMANDCAM_PATH
+
+        writeFileSync(
+          commandCam,
+          [
+            '#!/usr/bin/env node',
+            "process.stderr.write('Available capture devices:\\nIntegrated Webcam\\n')"
+          ].join('\n')
+        )
+        chmodSync(commandCam, 0o755)
+        process.env.NODE_WEBCAM_COMMANDCAM_PATH = commandCam
+
+        try {
+          const cameras = await getPlatformCameras({ platform: 'win32' })
+
+          assert.deepEqual(cameras, ['Integrated Webcam'])
+        } finally {
+          if (originalCommandCamPath === undefined)
+            delete process.env.NODE_WEBCAM_COMMANDCAM_PATH
+          else process.env.NODE_WEBCAM_COMMANDCAM_PATH = originalCommandCamPath
+
+          rmSync(directory, { force: true, recursive: true })
+        }
+      })
+
       assert.deepEqual(cameras, ['Integrated Webcam', 'USB Camera'])
     } finally {
       rmSync(directory, { force: true, recursive: true })

@@ -1,5 +1,6 @@
 import os from 'os'
 import { spawnSync } from 'child_process'
+import { existsSync } from 'fs'
 
 import { WebcamError } from '../errors'
 import type { WebcamConfig } from '../types'
@@ -43,6 +44,12 @@ class FFmpegWebcam extends BaseWebcam {
 
     if (platform === 'win32' && !FFmpegWebcam.getDevice(options, platform))
       return false
+
+    if (platform === 'linux') {
+      const device = FFmpegWebcam.getDevice(options, platform)
+
+      if (!existsSync(device)) return false
+    }
 
     const bin =
       options.ffmpegPath || process.env.NODE_WEBCAM_FFMPEG_PATH || 'ffmpeg'

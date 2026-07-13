@@ -3,10 +3,10 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <linux/videodev2.h>
+#include <poll.h>
 #include <string.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
-#include <sys/select.h>
 #include <unistd.h>
 
 #include <algorithm>
@@ -302,7 +302,11 @@ namespace {
   // Step 2: ask the camera for MJPEG frames at the requested resolution. This is
   // intentionally narrow for the spike because MJPEG can be returned directly as a
   // JPEG Buffer to JavaScript.
-  void ConfigureMjpegFormat(int fd, const NativeOptions& options) {
+  void ConfigureMjpegFormat(
+    int fd,
+    const NativeOptions& options,
+    bool applyFormat
+  ) {
     v4l2_format format = {};
     format.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     format.fmt.pix.width = options.width;
@@ -310,7 +314,9 @@ namespace {
     format.fmt.pix.pixelformat = V4L2_PIX_FMT_MJPEG;
     format.fmt.pix.field = V4L2_FIELD_ANY;
 
-    if (Xioctl(fd, VIDIOC_S_FMT, &format) == -1)
+    const unsigned long request = applyFormat ? VIDIOC_S_FMT : VIDIOC_TRY_FMT;
+
+    if (Xioctl(fd, request, &format) == -1)
       throw NativeSystemError(
         errno == EBUSY
           ? "NODE_WEBCAM_NATIVE_DEVICE_BUSY"
@@ -409,16 +415,11 @@ namespace {
   // Step 5: wait until the device signals that at least one queued buffer has
   // frame data available.
   void WaitForFrame(int fd, uint32_t timeoutMs) {
-    fd_set descriptors;
-    timeval timeout = {};
+    pollfd descriptor = {};
+    descriptor.fd = fd;
+    descriptor.events = POLLIN;
 
-    FD_ZERO(&descriptors);
-    FD_SET(fd, &descriptors);
-
-    timeout.tv_sec = timeoutMs / 1000;
-    timeout.tv_usec = static_cast<suseconds_t>((timeoutMs % 1000) * 1000);
-
-    const int result = select(fd + 1, &descriptors, nullptr, nullptr, &timeout);
+    const int result = poll(&descriptor, 1, static_cast<int>(timeoutMs));
 
     if (result == -1)
       throw NativeSystemError(
@@ -453,7 +454,7 @@ namespace {
     FileDescriptor device(fd);
 
     AssertCaptureDevice(device.get(), options.device);
-    ConfigureMjpegFormat(device.get(), options);
+    ConfigureMjpegFormat(device.get(), options, true);
 
     MappedBuffers mappedBuffers = RequestMappedBuffers(device.get());
 
@@ -533,7 +534,7 @@ namespace {
 
     try {
       AssertCaptureDevice(device.get(), options.device);
-      ConfigureMjpegFormat(device.get(), options);
+      ConfigureMjpegFormat(device.get(), options, false);
 
       return true;
     } catch (...) {

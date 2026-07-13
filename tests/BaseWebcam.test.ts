@@ -578,7 +578,22 @@ describe('BaseWebcam', () => {
 
       assert.equal(webcam.base64Calls, 0)
       assert.equal(result.toBase64(), 'data:image/png;base64,AQID')
-      assert.equal(webcam.base64Calls, 1)
+      assert.equal(webcam.base64Calls, 0)
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
+  })
+
+  it('uses jpeg as the data URL MIME type for jpg output', async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'node-webcam-'))
+    const path = join(directory, 'photo.jpg')
+    const webcam = createWriteImageWebcam(path, { output: 'jpg' })
+
+    try {
+      const result = await webcam.capture({ location: path })
+
+      assert.equal(result.mimeType, 'image/jpeg')
+      assert.equal(result.toBase64(), 'data:image/jpeg;base64,AQID')
     } finally {
       rmSync(directory, { recursive: true, force: true })
     }

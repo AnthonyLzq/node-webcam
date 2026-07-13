@@ -214,7 +214,9 @@ class BaseWebcam {
   }
 
   protected getCaptureMimeType() {
-    return `image/${this.#options.output}`
+    return `image/${
+      this.#options.output === 'jpg' ? 'jpeg' : this.#options.output
+    }`
   }
 
   protected getCaptureQueueKeys(path: string) {
@@ -498,7 +500,14 @@ class BaseWebcam {
     }
 
     try {
-      await this.persistCaptureOutput(path, buffer)
+      if (
+        !(
+          capture.kind === 'file' &&
+          capture.path === path &&
+          this.#options.save === true
+        )
+      )
+        await this.persistCaptureOutput(path, buffer)
     } catch (error) {
       const elapsedMs = this.getElapsedMs(startedAt)
       const typedError = new WebcamError({
@@ -569,7 +578,7 @@ class BaseWebcam {
       location: path,
       mimeType,
       queueWaitMs,
-      toBase64: () => this.getBase64FromBuffer(buffer)
+      toBase64: () => `data:${mimeType};base64,${buffer.toString('base64')}`
     }
   }
 

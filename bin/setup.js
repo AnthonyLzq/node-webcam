@@ -194,7 +194,7 @@ const installCommandCam = async ({
   strict = isEnabled(STRICT_DOWNLOAD_VALUES, env.NODE_WEBCAM_COMMANDCAM_STRICT),
   targetFiles = getCommandCamTargetFiles({ env })
 } = {}) => {
-  if (!platform.match(/win/)) return { status: 'skipped', reason: 'platform' }
+  if (platform !== 'win32') return { status: 'skipped', reason: 'platform' }
 
   if (isEnabled(SKIP_DOWNLOAD_VALUES, env.NODE_WEBCAM_SKIP_COMMANDCAM_DOWNLOAD))
     return { status: 'skipped', reason: 'env' }

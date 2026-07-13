@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { afterEach, describe, it, mock } from 'node:test'
 
 import {
+  capture,
   create,
   FSWebcam,
   ImageSnapWebcam,
@@ -65,9 +66,36 @@ describe('create', () => {
 
   it('uses ffmpeg on Linux before falling back to fswebcam', () => {
     mock.method(os, 'platform', () => 'linux')
+    mock.method(NativeLinuxWebcam, 'isAvailable', () => false)
     mock.method(FFmpegWebcam, 'isAvailable', () => true)
 
     const webcam = create({ output: 'png' })
+
+    assert.ok(webcam instanceof FFmpegWebcam)
+  })
+
+  it('keeps fswebcam on Linux when legacy-only options are requested', () => {
+    mock.method(os, 'platform', () => 'linux')
+    mock.method(NativeLinuxWebcam, 'isAvailable', () => true)
+    mock.method(FFmpegWebcam, 'isAvailable', () => true)
+
+    const webcam = create({
+      output: 'jpeg',
+      title: 'Desk'
+    })
+
+    assert.ok(webcam instanceof FSWebcam)
+  })
+
+  it('uses ffmpeg on Linux when an ffmpeg path is explicitly configured', () => {
+    mock.method(os, 'platform', () => 'linux')
+    mock.method(NativeLinuxWebcam, 'isAvailable', () => true)
+    mock.method(FFmpegWebcam, 'isAvailable', () => true)
+
+    const webcam = create({
+      ffmpegPath: '/usr/bin/ffmpeg',
+      output: 'jpeg'
+    })
 
     assert.ok(webcam instanceof FFmpegWebcam)
   })
@@ -139,6 +167,15 @@ describe('create', () => {
     assert.ok(webcam instanceof FFmpegWebcam)
   })
 
+  it('keeps imagesnap on macOS when legacy-only options are requested', () => {
+    mock.method(os, 'platform', () => 'darwin')
+    mock.method(FFmpegWebcam, 'isAvailable', () => true)
+
+    const webcam = create({ delay: 1 })
+
+    assert.ok(webcam instanceof ImageSnapWebcam)
+  })
+
   it('creates the Windows backend on win32', () => {
     mock.method(os, 'platform', () => 'win32')
     mock.method(FFmpegWebcam, 'isAvailable', () => false)
@@ -154,6 +191,43 @@ describe('create', () => {
     }
   })
 
+  it('uses a backend-compatible default capture location on Windows', async () => {
+    mock.method(os, 'platform', () => 'win32')
+    mock.method(FFmpegWebcam, 'isAvailable', () => false)
+    const { cleanup, commandCamPath } = createCommandCamFixture()
+    process.env.NODE_WEBCAM_COMMANDCAM_PATH = commandCamPath
+
+    try {
+      const captured: string[] = []
+
+      mock.method(
+        WindowsWebcam.prototype,
+        'capture',
+        async ({ location }: { location: string }) => {
+          captured.push(location)
+
+          return {
+            backend: 'WindowsWebcam',
+            backendType: 'legacy',
+            buffer: Buffer.from([]),
+            bytes: 0,
+            elapsedMs: 0,
+            location,
+            mimeType: 'image/bmp',
+            queueWaitMs: 0,
+            toBase64: () => ''
+          }
+        }
+      )
+
+      await capture()
+
+      assert.deepEqual(captured, ['location.bmp'])
+    } finally {
+      cleanup()
+    }
+  })
+
   it('uses ffmpeg on Windows before falling back to CommandCam', () => {
     mock.method(os, 'platform', () => 'win32')
     mock.method(FFmpegWebcam, 'isAvailable', () => true)
@@ -161,6 +235,24 @@ describe('create', () => {
     const webcam = create({ device: 'Integrated Webcam' })
 
     assert.ok(webcam instanceof FFmpegWebcam)
+  })
+
+  it('keeps CommandCam on Windows when legacy-only options are requested', () => {
+    mock.method(os, 'platform', () => 'win32')
+    mock.method(FFmpegWebcam, 'isAvailable', () => true)
+    const { cleanup, commandCamPath } = createCommandCamFixture()
+    process.env.NODE_WEBCAM_COMMANDCAM_PATH = commandCamPath
+
+    try {
+      const webcam = create({
+        delay: 1,
+        device: 'Integrated Webcam'
+      })
+
+      assert.ok(webcam instanceof WindowsWebcam)
+    } finally {
+      cleanup()
+    }
   })
 
   it('rejects unsupported current platforms', () => {

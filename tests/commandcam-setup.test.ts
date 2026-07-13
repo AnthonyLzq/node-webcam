@@ -87,14 +87,16 @@ describe('CommandCam setup', () => {
   })
 
   it('skips non-Windows platforms without downloading', async () => {
-    const result = await setup.installCommandCam({
-      download: async () => {
-        throw new Error('download should not be called')
-      },
-      platform: 'linux'
-    })
+    for (const platform of ['darwin', 'linux']) {
+      const result = await setup.installCommandCam({
+        download: async () => {
+          throw new Error('download should not be called')
+        },
+        platform
+      })
 
-    assert.deepEqual(result, { reason: 'platform', status: 'skipped' })
+      assert.deepEqual(result, { reason: 'platform', status: 'skipped' })
+    }
   })
 
   it('writes verified CommandCam downloads to all build targets', async () => {
