@@ -1,5 +1,12 @@
 import assert from 'node:assert/strict'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  chmodSync,
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, it } from 'node:test'
@@ -253,6 +260,124 @@ describe('backend command generation', () => {
         'photo.jpeg'
       ]
     })
+  })
+
+  it('probes Linux ffmpeg capture availability before selecting it', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'node-webcam-ffmpeg-'))
+    const ffmpeg = join(directory, 'ffmpeg')
+    const device = join(directory, 'video0')
+    const argsPath = join(directory, 'args.json')
+    const originalArgsPath = process.env.NODE_WEBCAM_FFMPEG_ARGS_PATH
+
+    writeFileSync(device, '')
+    writeFileSync(
+      ffmpeg,
+      [
+        '#!/usr/bin/env node',
+        "require('node:fs').writeFileSync(process.env.NODE_WEBCAM_FFMPEG_ARGS_PATH, JSON.stringify(process.argv.slice(2)))"
+      ].join('\n')
+    )
+    chmodSync(ffmpeg, 0o755)
+    process.env.NODE_WEBCAM_FFMPEG_ARGS_PATH = argsPath
+    FFmpegWebcam.clearAvailabilityCache()
+
+    try {
+      assert.equal(
+        FFmpegWebcam.isAvailable(
+          {
+            device,
+            ffmpegPath: ffmpeg,
+            height: 480,
+            width: 640
+          },
+          'linux'
+        ),
+        true
+      )
+      assert.deepEqual(JSON.parse(readFileSync(argsPath, 'utf8')), [
+        '-hide_banner',
+        '-loglevel',
+        'error',
+        '-video_size',
+        '640x480',
+        '-f',
+        'video4linux2',
+        '-i',
+        device,
+        '-frames:v',
+        '1',
+        '-f',
+        'null',
+        '-'
+      ])
+    } finally {
+      if (originalArgsPath === undefined)
+        delete process.env.NODE_WEBCAM_FFMPEG_ARGS_PATH
+      else process.env.NODE_WEBCAM_FFMPEG_ARGS_PATH = originalArgsPath
+
+      FFmpegWebcam.clearAvailabilityCache()
+      rmSync(directory, { force: true, recursive: true })
+    }
+  })
+
+  it('does not select ffmpeg when the Linux capture probe fails', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'node-webcam-ffmpeg-'))
+    const ffmpeg = join(directory, 'ffmpeg')
+    const device = join(directory, 'video0')
+
+    writeFileSync(device, '')
+    writeFileSync(ffmpeg, '#!/usr/bin/env node\nprocess.exit(1)')
+    chmodSync(ffmpeg, 0o755)
+    FFmpegWebcam.clearAvailabilityCache()
+
+    try {
+      assert.equal(
+        FFmpegWebcam.isAvailable({ device, ffmpegPath: ffmpeg }, 'linux'),
+        false
+      )
+    } finally {
+      FFmpegWebcam.clearAvailabilityCache()
+      rmSync(directory, { force: true, recursive: true })
+    }
+  })
+
+  it('does not run ffmpeg when the Linux device does not exist', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'node-webcam-ffmpeg-'))
+    const ffmpeg = join(directory, 'ffmpeg')
+    const argsPath = join(directory, 'args.json')
+    const originalArgsPath = process.env.NODE_WEBCAM_FFMPEG_ARGS_PATH
+
+    writeFileSync(
+      ffmpeg,
+      [
+        '#!/usr/bin/env node',
+        "require('node:fs').writeFileSync(process.env.NODE_WEBCAM_FFMPEG_ARGS_PATH, JSON.stringify(process.argv.slice(2)))"
+      ].join('\n')
+    )
+    chmodSync(ffmpeg, 0o755)
+    process.env.NODE_WEBCAM_FFMPEG_ARGS_PATH = argsPath
+    FFmpegWebcam.clearAvailabilityCache()
+
+    try {
+      assert.equal(
+        FFmpegWebcam.isAvailable(
+          {
+            device: join(directory, 'missing-video0'),
+            ffmpegPath: ffmpeg
+          },
+          'linux'
+        ),
+        false
+      )
+      assert.equal(existsSync(argsPath), false)
+    } finally {
+      if (originalArgsPath === undefined)
+        delete process.env.NODE_WEBCAM_FFMPEG_ARGS_PATH
+      else process.env.NODE_WEBCAM_FFMPEG_ARGS_PATH = originalArgsPath
+
+      FFmpegWebcam.clearAvailabilityCache()
+      rmSync(directory, { force: true, recursive: true })
+    }
   })
 
   it('rejects Windows CommandCam output paths longer than its native buffer', () => {

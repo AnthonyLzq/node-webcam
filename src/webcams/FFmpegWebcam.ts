@@ -10,6 +10,7 @@ import { BaseWebcam, WebcamCommand } from './BaseWebcam'
 type FFmpegPlatform = 'darwin' | 'linux' | 'win32'
 
 const supportedFFmpegPlatforms = ['darwin', 'linux', 'win32']
+const availabilityCache = new Map<string, boolean>()
 
 const isFFmpegPlatform = (platform: string): platform is FFmpegPlatform =>
   supportedFFmpegPlatforms.includes(platform)
@@ -42,23 +43,99 @@ class FFmpegWebcam extends BaseWebcam {
   ) {
     if (!isFFmpegPlatform(platform)) return false
 
-    if (platform === 'win32' && !FFmpegWebcam.getDevice(options, platform))
-      return false
+    const device = FFmpegWebcam.getDevice(options, platform)
 
-    if (platform === 'linux') {
-      const device = FFmpegWebcam.getDevice(options, platform)
+    if (platform === 'win32' && !device) return false
 
-      if (!existsSync(device)) return false
-    }
+    if (platform === 'linux' && !existsSync(device)) return false
 
     const bin =
       options.ffmpegPath || process.env.NODE_WEBCAM_FFMPEG_PATH || 'ffmpeg'
-    const result = spawnSync(bin, ['-version'], {
-      stdio: 'ignore',
-      timeout: 1000
+    const cacheKey = FFmpegWebcam.getAvailabilityCacheKey({
+      bin,
+      device,
+      height: options.height ?? 720,
+      platform,
+      timeout: options.timeout ?? 0,
+      width: options.width ?? 1280
     })
+    const cachedAvailability = availabilityCache.get(cacheKey)
 
-    return result.status === 0
+    if (cachedAvailability !== undefined) return cachedAvailability
+
+    const result = spawnSync(
+      bin,
+      FFmpegWebcam.getAvailabilityProbeArgs(options, platform),
+      {
+        stdio: 'ignore',
+        timeout:
+          options.timeout && options.timeout > 0 ? options.timeout : 2_000
+      }
+    )
+    const isAvailable = result.status === 0
+
+    availabilityCache.set(cacheKey, isAvailable)
+
+    return isAvailable
+  }
+
+  static clearAvailabilityCache() {
+    availabilityCache.clear()
+  }
+
+  static getAvailabilityProbeArgs(
+    options: Partial<WebcamConfig>,
+    platform: FFmpegPlatform
+  ) {
+    const args = [
+      '-hide_banner',
+      '-loglevel',
+      'error',
+      '-video_size',
+      `${options.width ?? 1280}x${options.height ?? 720}`
+    ]
+    const device = FFmpegWebcam.getDevice(options, platform)
+
+    switch (platform) {
+      case 'linux':
+        args.push('-f', 'video4linux2', '-i', device)
+        break
+      case 'darwin':
+        args.push('-f', 'avfoundation', '-i', `${device}:none`)
+        break
+      case 'win32':
+        args.push('-f', 'dshow', '-i', `video=${device}`)
+        break
+    }
+
+    args.push('-frames:v', '1', '-f', 'null', '-')
+
+    return args
+  }
+
+  private static getAvailabilityCacheKey({
+    bin,
+    device,
+    height,
+    platform,
+    timeout,
+    width
+  }: {
+    bin: string
+    device: string
+    height: number
+    platform: FFmpegPlatform
+    timeout: number
+    width: number
+  }) {
+    return JSON.stringify({
+      bin,
+      device,
+      height,
+      platform,
+      timeout,
+      width
+    })
   }
 
   static getDevice(options: Partial<WebcamConfig>, platform: FFmpegPlatform) {
