@@ -9,10 +9,15 @@ export type NativeV4l2Options = {
   width: number
 }
 
+export type NativeV4l2DeviceOptions = {
+  device: string
+}
+
 export type NativeWebcamAddon = {
   captureMjpeg(options: NativeV4l2Options): Buffer
   captureMjpegAsync(options: NativeV4l2Options): Promise<Buffer>
   isAvailable(options: NativeV4l2Options): boolean
+  isCaptureDevice(options: NativeV4l2DeviceOptions): boolean
 }
 
 const nativeAddonFile = ['build', 'Release', 'node_webcam_native.node']
@@ -34,9 +39,11 @@ const isNativeWebcamAddon = (
   typeof candidate === 'object' &&
   candidate !== null &&
   'isAvailable' in candidate &&
+  'isCaptureDevice' in candidate &&
   'captureMjpeg' in candidate &&
   'captureMjpegAsync' in candidate &&
   typeof candidate.isAvailable === 'function' &&
+  typeof candidate.isCaptureDevice === 'function' &&
   typeof candidate.captureMjpeg === 'function' &&
   typeof candidate.captureMjpegAsync === 'function'
 

@@ -11,6 +11,14 @@ namespace {
     return result;
   }
 
+  napi_value IsCaptureDevice(napi_env env, napi_callback_info) {
+    napi_value result;
+
+    napi_get_boolean(env, false, &result);
+
+    return result;
+  }
+
   // Keep the same JS-facing API as the Linux addon so callers can probe
   // availability before attempting capture.
   napi_value CaptureMjpeg(napi_env env, napi_callback_info) {
@@ -44,6 +52,7 @@ namespace {
 
   // Export the functions used by the smoke script and runtime loader:
   // - isAvailable(options)
+  // - isCaptureDevice(options)
   // - captureMjpeg(options)
   // - captureMjpegAsync(options)
   napi_value Init(napi_env env, napi_value exports) {
@@ -69,6 +78,16 @@ namespace {
         nullptr
       },
       {
+        "isCaptureDevice",
+        nullptr,
+        IsCaptureDevice,
+        nullptr,
+        nullptr,
+        nullptr,
+        napi_default,
+        nullptr
+      },
+      {
         "captureMjpegAsync",
         nullptr,
         CaptureMjpegAsync,
@@ -80,7 +99,7 @@ namespace {
       }
     };
 
-    napi_define_properties(env, exports, 3, properties);
+    napi_define_properties(env, exports, 4, properties);
 
     return exports;
   }

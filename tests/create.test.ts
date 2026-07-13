@@ -20,13 +20,15 @@ import type { NativeWebcamAddon } from '../src/native'
 const unavailableNativeAddon: NativeWebcamAddon = {
   captureMjpeg: () => Buffer.from([1, 2, 3]),
   captureMjpegAsync: async () => Buffer.from([1, 2, 3]),
-  isAvailable: () => false
+  isAvailable: () => false,
+  isCaptureDevice: () => false
 }
 
 const availableNativeAddon: NativeWebcamAddon = {
   captureMjpeg: () => Buffer.from([1, 2, 3]),
   captureMjpegAsync: async () => Buffer.from([1, 2, 3]),
-  isAvailable: () => true
+  isAvailable: () => true,
+  isCaptureDevice: () => true
 }
 
 const createFailingNativeAddon = (code: string, message: string) => ({
@@ -44,7 +46,8 @@ const createFailingNativeAddon = (code: string, message: string) => ({
 
     throw error
   },
-  isAvailable: () => true
+  isAvailable: () => true,
+  isCaptureDevice: () => true
 })
 
 const createCommandCamFixture = () => {
@@ -207,7 +210,8 @@ describe('create', () => {
           throw new Error('sync capture should not be used')
         },
         captureMjpegAsync: async () => Buffer.from([1, 2, 3]),
-        isAvailable: () => true
+        isAvailable: () => true,
+        isCaptureDevice: () => true
       },
       save: false
     })

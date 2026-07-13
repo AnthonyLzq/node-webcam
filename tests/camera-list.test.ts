@@ -8,6 +8,7 @@ import { list, listWebcams } from '../src'
 import {
   getCameras,
   getImageSnapListCommand,
+  getLinuxCameras,
   getPlatformCameras,
   getWindowsListCommand,
   parseImageSnapCameras,
@@ -40,6 +41,58 @@ describe('camera listing', () => {
     const cameras = await getPlatformCameras({ platform: 'linux' })
 
     assert.ok(Array.isArray(cameras))
+  })
+
+  it('filters Linux camera listing to capture-capable video devices', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'node-webcam-linux-dev-'))
+    const video0 = join(directory, 'video0')
+    const video1 = join(directory, 'video1')
+    const video10 = join(directory, 'video10')
+    const probedDevices: string[] = []
+
+    writeFileSync(video1, '')
+    writeFileSync(join(directory, 'audio0'), '')
+    writeFileSync(video10, '')
+    writeFileSync(video0, '')
+    writeFileSync(join(directory, 'video-metadata'), '')
+
+    try {
+      const cameras = getLinuxCameras({
+        deviceDirectory: directory,
+        isCaptureDevice: device => {
+          probedDevices.push(device)
+
+          return device !== video1
+        }
+      })
+
+      assert.deepEqual(cameras, [video0, video10])
+      assert.deepEqual(probedDevices, [video0, video1, video10])
+    } finally {
+      rmSync(directory, { force: true, recursive: true })
+    }
+  })
+
+  it('uses the native V4L2 capture probe for Linux camera listing', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'node-webcam-linux-dev-'))
+    const video0 = join(directory, 'video0')
+    const video1 = join(directory, 'video1')
+
+    writeFileSync(video0, '')
+    writeFileSync(video1, '')
+
+    try {
+      const cameras = getLinuxCameras({
+        deviceDirectory: directory,
+        nativeAddon: {
+          isCaptureDevice: ({ device }) => device === video0
+        }
+      })
+
+      assert.deepEqual(cameras, [video0])
+    } finally {
+      rmSync(directory, { force: true, recursive: true })
+    }
   })
 
   it('returns an empty array for unsupported platforms', async () => {

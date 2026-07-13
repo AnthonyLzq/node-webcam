@@ -1,6 +1,7 @@
 import { execFile } from 'child_process'
 import fs from 'fs'
 import os from 'os'
+import path from 'path'
 import { promisify } from 'util'
 
 import {
@@ -8,9 +9,11 @@ import {
   getCommandErrorCode,
   getCommandErrorMessage
 } from '../errors'
+import { loadNativeWebcamAddon, type NativeWebcamAddon } from '../native'
 import { resolveCommandCamPath } from './commandCam'
 
 const asyncExecFile = promisify(execFile)
+const linuxVideoDevicePattern = /^video\d+$/i
 
 type CameraListCommand = {
   file: string
@@ -24,17 +27,55 @@ type GetCamerasOptions = {
   windowsCommandCamPath?: string
 }
 
-const getLinuxCameras = () => {
-  const req = /^video/i
-  const dir = '/dev/'
-  const result = fs.readdirSync(dir)
-  const cameras = result.reduce<string[]>((acc, d) => {
-    if (d.match(req)) acc.push(dir + d)
+type LinuxCameraCapabilityProbe = (device: string) => boolean
 
-    return acc
-  }, [])
+type GetLinuxCamerasOptions = {
+  deviceDirectory?: string
+  isCaptureDevice?: LinuxCameraCapabilityProbe
+  nativeAddon?: Pick<NativeWebcamAddon, 'isCaptureDevice'>
+}
 
-  return cameras
+const createLinuxCameraCapabilityProbe = (
+  addon: Pick<NativeWebcamAddon, 'isCaptureDevice'>
+): LinuxCameraCapabilityProbe => {
+  return device => addon.isCaptureDevice({ device })
+}
+
+const getDefaultLinuxCameraCapabilityProbe = () => {
+  const addon = loadNativeWebcamAddon()
+
+  if (!addon) return undefined
+
+  return createLinuxCameraCapabilityProbe(addon)
+}
+
+const getLinuxCameras = ({
+  deviceDirectory = '/dev',
+  isCaptureDevice,
+  nativeAddon
+}: GetLinuxCamerasOptions = {}) => {
+  const entries = fs.readdirSync(deviceDirectory)
+  const cameras = entries
+    .filter(entry => linuxVideoDevicePattern.test(entry))
+    .map(entry => path.join(deviceDirectory, entry))
+    .sort((left, right) =>
+      left.localeCompare(right, undefined, { numeric: true })
+    )
+  const canCapture =
+    isCaptureDevice ??
+    (nativeAddon
+      ? createLinuxCameraCapabilityProbe(nativeAddon)
+      : getDefaultLinuxCameraCapabilityProbe())
+
+  if (!canCapture) return cameras
+
+  return cameras.filter(camera => {
+    try {
+      return canCapture(camera)
+    } catch (_error) {
+      return false
+    }
+  })
 }
 
 const getCameras = (options: GetCamerasOptions = {}) => {

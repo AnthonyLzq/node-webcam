@@ -301,6 +301,13 @@ namespace {
     return capability.capabilities;
   }
 
+  bool HasVideoCaptureCapability(const v4l2_capability& capability) {
+    const uint32_t capabilities = GetEffectiveCapabilities(capability);
+
+    return (capabilities & V4L2_CAP_VIDEO_CAPTURE) ||
+           (capabilities & V4L2_CAP_VIDEO_CAPTURE_MPLANE);
+  }
+
   // Step 1: verify that the file descriptor is actually a capture-capable V4L2
   // device and that it supports streaming buffers.
   void AssertCaptureDevice(int fd, const std::string& device) {
@@ -325,6 +332,20 @@ namespace {
         "NODE_WEBCAM_NATIVE_DEVICE_UNSUPPORTED",
         "V4L2 device does not support streaming IO: " + device
       );
+  }
+
+  bool IsV4l2CaptureDevice(const NativeOptions& options) {
+    const int fd = open(options.device.c_str(), O_RDONLY | O_NONBLOCK, 0);
+
+    if (fd == -1) return false;
+
+    FileDescriptor device(fd);
+    v4l2_capability capability = {};
+
+    if (Xioctl(device.get(), VIDIOC_QUERYCAP, &capability) == -1)
+      return false;
+
+    return HasVideoCaptureCapability(capability);
   }
 
   // Step 2: ask the camera for MJPEG frames at the requested resolution. This is
@@ -602,6 +623,16 @@ namespace {
     return result;
   }
 
+  // JS export: isCaptureDevice(options) -> boolean
+  napi_value IsCaptureDevice(napi_env env, napi_callback_info info) {
+    const NativeOptions options = ParseOptions(env, info);
+    napi_value result;
+
+    napi_get_boolean(env, IsV4l2CaptureDevice(options), &result);
+
+    return result;
+  }
+
   // JS export: captureMjpeg(options) -> Buffer
   napi_value CaptureMjpeg(napi_env env, napi_callback_info info) {
     try {
@@ -746,6 +777,16 @@ namespace {
         nullptr
       },
       {
+        "isCaptureDevice",
+        nullptr,
+        IsCaptureDevice,
+        nullptr,
+        nullptr,
+        nullptr,
+        napi_default,
+        nullptr
+      },
+      {
         "captureMjpeg",
         nullptr,
         CaptureMjpeg,
@@ -767,7 +808,7 @@ namespace {
       }
     };
 
-    napi_define_properties(env, exports, 3, properties);
+    napi_define_properties(env, exports, 4, properties);
 
     return exports;
   }
