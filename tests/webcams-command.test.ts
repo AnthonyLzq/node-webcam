@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict'
-import { resolve } from 'node:path'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { describe, it } from 'node:test'
 
 import {
@@ -8,6 +10,25 @@ import {
   ImageSnapWebcam,
   WindowsWebcam
 } from '../src/webcams'
+
+const withCommandCamPath = (fn: (commandCamPath: string) => void) => {
+  const directory = mkdtempSync(join(tmpdir(), 'node-webcam-commandcam-'))
+  const commandCamPath = join(directory, 'CommandCam.exe')
+  const originalCommandCamPath = process.env.NODE_WEBCAM_COMMANDCAM_PATH
+
+  writeFileSync(commandCamPath, '')
+  process.env.NODE_WEBCAM_COMMANDCAM_PATH = commandCamPath
+
+  try {
+    fn(commandCamPath)
+  } finally {
+    if (originalCommandCamPath === undefined)
+      delete process.env.NODE_WEBCAM_COMMANDCAM_PATH
+    else process.env.NODE_WEBCAM_COMMANDCAM_PATH = originalCommandCamPath
+
+    rmSync(directory, { force: true, recursive: true })
+  }
+}
 
 describe('backend command generation', () => {
   it('preserves the default fswebcam command', () => {
@@ -115,43 +136,34 @@ describe('backend command generation', () => {
   })
 
   it('preserves the default Windows CommandCam command', () => {
-    const bin = resolve(
-      process.cwd(),
-      'src',
-      'bindings',
-      'CommandCam',
-      'CommandCam.exe'
-    )
+    withCommandCamPath(commandCamPath => {
+      const webcam = new WindowsWebcam({})
+      const command = webcam.generateSh('photo.bmp')
 
-    const webcam = new WindowsWebcam({})
-    const command = webcam.generateSh('photo.bmp')
-
-    assert.equal(command, `${bin} /filename photo.bmp`)
-    assert.deepEqual(webcam.generateCommand('photo.bmp'), {
-      file: bin,
-      args: ['/filename', 'photo.bmp']
+      assert.equal(command, `${commandCamPath} /filename photo.bmp`)
+      assert.deepEqual(webcam.generateCommand('photo.bmp'), {
+        file: commandCamPath,
+        args: ['/filename', 'photo.bmp']
+      })
     })
   })
 
   it('preserves Windows delay and device arguments', () => {
-    const bin = resolve(
-      process.cwd(),
-      'src',
-      'bindings',
-      'CommandCam',
-      'CommandCam.exe'
-    )
+    withCommandCamPath(commandCamPath => {
+      const webcam = new WindowsWebcam({
+        delay: 2,
+        device: '1'
+      })
+      const command = webcam.generateSh('photo.bmp')
 
-    const webcam = new WindowsWebcam({
-      delay: 2,
-      device: '1'
-    })
-    const command = webcam.generateSh('photo.bmp')
-
-    assert.equal(command, `${bin} /delay 2000 /devnum 1 /filename photo.bmp`)
-    assert.deepEqual(webcam.generateCommand('photo.bmp'), {
-      file: bin,
-      args: ['/delay', '2000', '/devnum', '1', '/filename', 'photo.bmp']
+      assert.equal(
+        command,
+        `${commandCamPath} /delay 2000 /devnum 1 /filename photo.bmp`
+      )
+      assert.deepEqual(webcam.generateCommand('photo.bmp'), {
+        file: commandCamPath,
+        args: ['/delay', '2000', '/devnum', '1', '/filename', 'photo.bmp']
+      })
     })
   })
 
@@ -244,33 +256,37 @@ describe('backend command generation', () => {
   })
 
   it('rejects Windows CommandCam output paths longer than its native buffer', () => {
-    const webcam = new WindowsWebcam({})
-    const longPath = `${'a'.repeat(96)}.bmp`
+    withCommandCamPath(() => {
+      const webcam = new WindowsWebcam({})
+      const longPath = `${'a'.repeat(96)}.bmp`
 
-    assert.throws(() => webcam.generateCommand(longPath), {
-      code: 'INVALID_OUTPUT_PATH',
-      message:
-        'Invalid Windows output path, CommandCam paths must be 99 bytes or less: 100',
-      name: 'WebcamError'
-    })
-    assert.throws(() => webcam.generateSh(longPath), {
-      code: 'INVALID_OUTPUT_PATH',
-      name: 'WebcamError'
+      assert.throws(() => webcam.generateCommand(longPath), {
+        code: 'INVALID_OUTPUT_PATH',
+        message:
+          'Invalid Windows output path, CommandCam paths must be 99 bytes or less: 100',
+        name: 'WebcamError'
+      })
+      assert.throws(() => webcam.generateSh(longPath), {
+        code: 'INVALID_OUTPUT_PATH',
+        name: 'WebcamError'
+      })
     })
   })
 
   it('rejects Windows CommandCam output paths containing double quotes', () => {
-    const webcam = new WindowsWebcam({})
+    withCommandCamPath(() => {
+      const webcam = new WindowsWebcam({})
 
-    assert.throws(() => webcam.generateCommand('"quoted.bmp'), {
-      code: 'INVALID_OUTPUT_PATH',
-      message:
-        'Invalid Windows output path, CommandCam paths must not contain double quotes',
-      name: 'WebcamError'
-    })
-    assert.throws(() => webcam.generateSh('quoted".bmp'), {
-      code: 'INVALID_OUTPUT_PATH',
-      name: 'WebcamError'
+      assert.throws(() => webcam.generateCommand('"quoted.bmp'), {
+        code: 'INVALID_OUTPUT_PATH',
+        message:
+          'Invalid Windows output path, CommandCam paths must not contain double quotes',
+        name: 'WebcamError'
+      })
+      assert.throws(() => webcam.generateSh('quoted".bmp'), {
+        code: 'INVALID_OUTPUT_PATH',
+        name: 'WebcamError'
+      })
     })
   })
 

@@ -1,8 +1,6 @@
-import { resolve } from 'path'
-
 import { WebcamError } from '../errors'
 import type { WebcamConfig } from '../types'
-import { getPlatformCameras } from '../utils'
+import { getPlatformCameras, resolveCommandCamPath } from '../utils'
 import { BaseWebcam, WebcamCommand } from './BaseWebcam'
 
 const COMMAND_CAM_MAX_ARGUMENT_BYTES = 99
@@ -12,13 +10,7 @@ class WindowsWebcam extends BaseWebcam {
 
   constructor(options?: Partial<WebcamConfig>) {
     super({ ...options, output: 'bmp' })
-    this.#bin = resolve(
-      __dirname,
-      '..',
-      'bindings',
-      'CommandCam',
-      'CommandCam.exe'
-    )
+    this.#bin = resolveCommandCamPath()
 
     if (options?.delay) super.setDelayInMilliseconds()
   }

@@ -15,7 +15,8 @@ const forbiddenPackageEntries = /^(?:\.goals|docs|examples|src|tests|tsconfig|\.
 const requiredPackageEntries = [
   'LICENSE',
   'README.md',
-  'bin/postinstall.js',
+  'bin/node-webcam.js',
+  'bin/setup.js',
   'binding.gyp',
   'dist/cjs/index.js',
   'dist/esm/index.js',
@@ -217,6 +218,17 @@ try {
     cwd: consumerDirectory,
     stdio: 'ignore'
   })
+
+  execFileSync(
+    process.platform === 'win32'
+      ? join(consumerDirectory, 'node_modules', '.bin', 'node-webcam.cmd')
+      : join(consumerDirectory, 'node_modules', '.bin', 'node-webcam'),
+    ['setup', 'windows'],
+    {
+      cwd: consumerDirectory,
+      stdio: 'ignore'
+    }
+  )
 
   console.log(
     `Validated package tarball (${pack.entryCount} files) and temporary consumer.`

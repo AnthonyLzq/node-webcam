@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
+import { join } from 'node:path'
 import { afterEach, describe, it, mock } from 'node:test'
 
 import {
@@ -34,9 +36,22 @@ const createFailingNativeAddon = (code: string, message: string) => ({
   isAvailable: () => true
 })
 
+const createCommandCamFixture = () => {
+  const directory = mkdtempSync(join(os.tmpdir(), 'node-webcam-commandcam-'))
+  const commandCamPath = join(directory, 'CommandCam.exe')
+
+  writeFileSync(commandCamPath, '')
+
+  return {
+    commandCamPath,
+    cleanup: () => rmSync(directory, { force: true, recursive: true })
+  }
+}
+
 describe('create', () => {
   afterEach(() => {
     mock.restoreAll()
+    delete process.env.NODE_WEBCAM_COMMANDCAM_PATH
   })
 
   it('creates the linux backend on linux', () => {
@@ -127,10 +142,16 @@ describe('create', () => {
   it('creates the Windows backend on win32', () => {
     mock.method(os, 'platform', () => 'win32')
     mock.method(FFmpegWebcam, 'isAvailable', () => false)
+    const { cleanup, commandCamPath } = createCommandCamFixture()
+    process.env.NODE_WEBCAM_COMMANDCAM_PATH = commandCamPath
 
-    const webcam = create()
+    try {
+      const webcam = create()
 
-    assert.ok(webcam instanceof WindowsWebcam)
+      assert.ok(webcam instanceof WindowsWebcam)
+    } finally {
+      cleanup()
+    }
   })
 
   it('uses ffmpeg on Windows before falling back to CommandCam', () => {

@@ -41,10 +41,23 @@ const getCommandCamDownloadUrl = ({ env = process.env } = {}) => {
   return `https://github.com/${getRepositorySlug()}/releases/download/${releaseTag}/CommandCam.exe`
 }
 
-const getCommandCamTargetFiles = () => [
-  path.resolve('dist/cjs/bindings/CommandCam/CommandCam.exe'),
-  path.resolve('dist/esm/bindings/CommandCam/CommandCam.exe')
-]
+const getCommandCamBaseDirectory = ({
+  env = process.env,
+  homedir = os.homedir()
+} = {}) => {
+  if (env.NODE_WEBCAM_COMMANDCAM_DIR) return env.NODE_WEBCAM_COMMANDCAM_DIR
+
+  return path.join(
+    env.LOCALAPPDATA || path.join(homedir, 'AppData', 'Local'),
+    'node-webcam',
+    'CommandCam'
+  )
+}
+
+const getCommandCamPath = (options = {}) =>
+  path.join(getCommandCamBaseDirectory(options), 'CommandCam.exe')
+
+const getCommandCamTargetFiles = options => [getCommandCamPath(options)]
 
 const getTimeoutMs = env => {
   const timeout = Number(env.NODE_WEBCAM_COMMANDCAM_TIMEOUT_MS)
@@ -178,7 +191,8 @@ const installCommandCam = async ({
   env = process.env,
   logger = console,
   platform = os.platform(),
-  targetFiles = getCommandCamTargetFiles()
+  strict = isEnabled(STRICT_DOWNLOAD_VALUES, env.NODE_WEBCAM_COMMANDCAM_STRICT),
+  targetFiles = getCommandCamTargetFiles({ env })
 } = {}) => {
   if (!platform.match(/win/)) return { status: 'skipped', reason: 'platform' }
 
@@ -205,34 +219,26 @@ const installCommandCam = async ({
 
     return { status: 'installed', targetFiles }
   } catch (error) {
-    if (isEnabled(STRICT_DOWNLOAD_VALUES, env.NODE_WEBCAM_COMMANDCAM_STRICT))
-      throw error
+    if (strict) throw error
 
     logger.warn(
       `Unable to install CommandCam.exe automatically: ${error.message}`
     )
     logger.warn(
-      'Windows webcam capture will require a manually installed CommandCam.exe or NODE_WEBCAM_COMMANDCAM_URL.'
+      'Windows webcam capture will require a manually installed CommandCam.exe or NODE_WEBCAM_COMMANDCAM_PATH.'
     )
 
     return { error, status: 'failed' }
   }
 }
 
-const init = () => installCommandCam()
-
-if (require.main === module) {
-  init().catch(error => {
-    console.error(error.message)
-    process.exitCode = 1
-  })
-}
-
 module.exports = {
   COMMAND_CAM_SHA256,
   COMMAND_CAM_RELEASE_TAG,
   downloadCommandCam,
+  getCommandCamBaseDirectory,
   getCommandCamDownloadUrl,
+  getCommandCamPath,
   getCommandCamTargetFiles,
   installCommandCam,
   resolveRedirectUrl,

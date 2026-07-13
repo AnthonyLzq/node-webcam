@@ -14,7 +14,7 @@
     "build:types": "tsc -p tsconfig.types.json",
     "benchmark:capture": "npm run native:build && ts-node benchmarks/capture-backends.ts",
     "check": "npm run typecheck && npm run lint:check && npm test",
-    "postinstall": "node ./bin/postinstall.js",
+    "setup:windows": "node ./bin/node-webcam.js setup windows",
     "demo": "npm run build && ts-node examples/websocket/App.ts",
     "lint": "npm run lint:check",
     "lint:check": "eslint benchmarks src tests --ext .ts",
@@ -63,6 +63,9 @@
       "default": "./dist/esm/index.js"
     }
   },
+  "bin": {
+    "node-webcam": "bin/node-webcam.js"
+  },
   "nodeWebcam": {
     "commandCam": {
       "releaseTag": "v2.1.0",
@@ -71,7 +74,8 @@
     }
   },
   "files": [
-    "bin/postinstall.js",
+    "bin/node-webcam.js",
+    "bin/setup.js",
     "binding.gyp",
     "dist",
     "LICENSE",

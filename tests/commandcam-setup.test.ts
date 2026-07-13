@@ -15,8 +15,12 @@ type DownloadOptions = {
   url: string
 }
 
-const postinstall = require('../bin/postinstall') as {
+const setup = require('../bin/setup') as {
   COMMAND_CAM_RELEASE_TAG: string
+  getCommandCamPath: (options?: {
+    env?: Record<string, string | undefined>
+    homedir?: string
+  }) => string
   getCommandCamDownloadUrl: (options?: {
     env?: Record<string, string | undefined>
   }) => string
@@ -38,25 +42,25 @@ const postinstall = require('../bin/postinstall') as {
 const sha256 = (buffer: Buffer) =>
   createHash('sha256').update(buffer).digest('hex')
 
-describe('postinstall CommandCam installer', () => {
+describe('CommandCam setup', () => {
   it('uses a pinned CommandCam release tag by default', () => {
-    assert.equal(postinstall.COMMAND_CAM_RELEASE_TAG, 'v2.1.0')
+    assert.equal(setup.COMMAND_CAM_RELEASE_TAG, 'v2.1.0')
     assert.match(
-      postinstall.getCommandCamDownloadUrl({ env: {} }),
+      setup.getCommandCamDownloadUrl({ env: {} }),
       /\/releases\/download\/v2\.1\.0\/CommandCam\.exe$/
     )
   })
 
   it('allows overriding the CommandCam release URL', () => {
     assert.equal(
-      postinstall.getCommandCamDownloadUrl({
+      setup.getCommandCamDownloadUrl({
         env: { NODE_WEBCAM_COMMANDCAM_RELEASE_TAG: 'commandcam-v1' }
       }),
       'https://github.com/AnthonyLzq/node-webcam/releases/download/commandcam-v1/CommandCam.exe'
     )
 
     assert.equal(
-      postinstall.getCommandCamDownloadUrl({
+      setup.getCommandCamDownloadUrl({
         env: {
           NODE_WEBCAM_COMMANDCAM_URL: 'https://example.com/CommandCam.exe'
         }
@@ -65,8 +69,25 @@ describe('postinstall CommandCam installer', () => {
     )
   })
 
+  it('stores CommandCam in a user-local cache path', () => {
+    assert.equal(
+      setup.getCommandCamPath({
+        env: { LOCALAPPDATA: 'C:\\Users\\me\\AppData\\Local' },
+        homedir: 'C:\\Users\\me'
+      }),
+      'C:\\Users\\me\\AppData\\Local/node-webcam/CommandCam/CommandCam.exe'
+    )
+
+    assert.equal(
+      setup.getCommandCamPath({
+        env: { NODE_WEBCAM_COMMANDCAM_DIR: 'D:\\node-webcam' }
+      }),
+      'D:\\node-webcam/CommandCam.exe'
+    )
+  })
+
   it('skips non-Windows platforms without downloading', async () => {
-    const result = await postinstall.installCommandCam({
+    const result = await setup.installCommandCam({
       download: async () => {
         throw new Error('download should not be called')
       },
@@ -77,7 +98,9 @@ describe('postinstall CommandCam installer', () => {
   })
 
   it('writes verified CommandCam downloads to all build targets', async () => {
-    const directory = mkdtempSync(join(tmpdir(), 'node-webcam-postinstall-'))
+    const directory = mkdtempSync(
+      join(tmpdir(), 'node-webcam-commandcam-setup-')
+    )
     const buffer = Buffer.alloc(1_024, 1)
     const targetFiles = [
       join(directory, 'dist/cjs/bindings/CommandCam/CommandCam.exe'),
@@ -85,7 +108,7 @@ describe('postinstall CommandCam installer', () => {
     ]
 
     try {
-      const result = await postinstall.installCommandCam({
+      const result = await setup.installCommandCam({
         download: async ({ timeoutMs, url }) => {
           assert.equal(timeoutMs, 15_000)
           assert.match(url, /CommandCam\.exe$/)
@@ -111,7 +134,7 @@ describe('postinstall CommandCam installer', () => {
   it('rejects checksum mismatches in strict mode', async () => {
     await assert.rejects(
       () =>
-        postinstall.installCommandCam({
+        setup.installCommandCam({
           download: async () => Buffer.alloc(1_024, 1),
           env: {
             NODE_WEBCAM_COMMANDCAM_SHA256: sha256(Buffer.alloc(1_024, 2)),
@@ -127,7 +150,7 @@ describe('postinstall CommandCam installer', () => {
 
   it('keeps installation non-fatal by default', async () => {
     const warnings: string[] = []
-    const result = await postinstall.installCommandCam({
+    const result = await setup.installCommandCam({
       download: async () => {
         throw new Error('offline')
       },
@@ -145,7 +168,7 @@ describe('postinstall CommandCam installer', () => {
 
   it('resolves relative redirect locations', () => {
     assert.equal(
-      postinstall.resolveRedirectUrl(
+      setup.resolveRedirectUrl(
         'https://github.com/owner/repo/releases/download/v1/CommandCam.exe',
         '/assets/CommandCam.exe'
       ),
@@ -158,7 +181,7 @@ describe('postinstall CommandCam installer', () => {
 
     assert.throws(
       () =>
-        postinstall.verifyCommandCamBuffer({
+        setup.verifyCommandCamBuffer({
           buffer,
           expectedSha256: sha256(buffer)
         }),

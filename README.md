@@ -38,13 +38,19 @@ brew install imagesnap
 ### Windows
 
 Windows uses `ffmpeg` when it is installed and a camera `device` name is
-provided, then falls back to `CommandCam.exe`. The package `postinstall`
-downloads the CommandCam release asset on Windows, verifies its SHA-256
-checksum, and installs it under the built package bindings. The CommandCam
-release tag and checksum are pinned in `package.json` and only need updates when
-that binary changes. Set `NODE_WEBCAM_SKIP_COMMANDCAM_DOWNLOAD=1` to skip the
-download, or `NODE_WEBCAM_COMMANDCAM_STRICT=1` to fail installation if the
-verified download cannot complete.
+provided, then falls back to `CommandCam.exe`. CommandCam is installed by an
+explicit setup command so package installation does not depend on lifecycle
+scripts:
+
+```sh
+npx @anthonylzq/node-webcam setup windows
+```
+
+The setup command downloads the CommandCam release asset on Windows, verifies
+its SHA-256 checksum, and stores it in the user-local `node-webcam` cache. The
+CommandCam release tag and checksum are pinned in `package.json` and only need
+updates when that binary changes. Set `NODE_WEBCAM_COMMANDCAM_PATH` to use a
+manually installed executable instead.
 
 ## Backend selection
 
