@@ -29,6 +29,15 @@ namespace {
     uint32_t timeoutMs = DEFAULT_TIMEOUT_MS;
   };
 
+  struct AsyncCaptureData {
+    napi_deferred deferred = nullptr;
+    napi_async_work work = nullptr;
+    NativeOptions options;
+    std::vector<uint8_t> frame;
+    std::string errorCode;
+    std::string errorMessage;
+  };
+
   struct MappedBuffer {
     void* start = nullptr;
     size_t length = 0;
@@ -155,12 +164,29 @@ namespace {
     return result;
   }
 
+  napi_value CreateNodeError(
+    napi_env env,
+    const std::string& code,
+    const std::string& message
+  ) {
+    napi_value error;
+    napi_value errorMessage;
+    napi_value errorCode;
+
+    napi_create_string_utf8(env, message.c_str(), NAPI_AUTO_LENGTH, &errorMessage);
+    napi_create_error(env, nullptr, errorMessage, &error);
+    napi_create_string_utf8(env, code.c_str(), NAPI_AUTO_LENGTH, &errorCode);
+    napi_set_named_property(env, error, "code", errorCode);
+
+    return error;
+  }
+
   void ThrowNodeError(
     napi_env env,
     const std::string& code,
     const std::string& message
   ) {
-    napi_throw_error(env, code.c_str(), message.c_str());
+    napi_throw(env, CreateNodeError(env, code, message));
   }
 
   /**
@@ -577,6 +603,111 @@ namespace {
     }
   }
 
+  void ExecuteCaptureMjpeg(napi_env, void* rawData) {
+    auto* data = static_cast<AsyncCaptureData*>(rawData);
+
+    try {
+      data->frame = CaptureMjpegFrame(data->options);
+    } catch (const NativeCaptureError& error) {
+      data->errorCode = error.code();
+      data->errorMessage = error.what();
+    } catch (const std::exception& error) {
+      data->errorCode = "NODE_WEBCAM_NATIVE_CAPTURE_FAILED";
+      data->errorMessage = error.what();
+      }
+  }
+
+  void CompleteCaptureMjpeg(napi_env env, napi_status status, void* rawData) {
+    auto* data = static_cast<AsyncCaptureData*>(rawData);
+
+    if (status != napi_ok && data->errorMessage.empty()) {
+      data->errorCode = "NODE_WEBCAM_NATIVE_CAPTURE_FAILED";
+      data->errorMessage = "Native V4L2 async capture was cancelled";
+    }
+
+    if (!data->errorMessage.empty()) {
+      napi_reject_deferred(
+        env,
+        data->deferred,
+        CreateNodeError(env, data->errorCode, data->errorMessage)
+      );
+    } else {
+      napi_value buffer;
+
+      napi_create_buffer_copy(
+        env,
+        data->frame.size(),
+        data->frame.data(),
+        nullptr,
+        &buffer
+      );
+      napi_resolve_deferred(env, data->deferred, buffer);
+    }
+
+    napi_delete_async_work(env, data->work);
+    delete data;
+  }
+
+  // JS export: captureMjpegAsync(options) -> Promise<Buffer>
+  napi_value CaptureMjpegAsync(napi_env env, napi_callback_info info) {
+    auto* data = new AsyncCaptureData();
+    napi_value promise;
+    napi_value resourceName;
+
+    data->options = ParseOptions(env, info);
+
+    napi_create_promise(env, &data->deferred, &promise);
+    napi_create_string_utf8(
+      env,
+      "node-webcam:captureMjpegAsync",
+      NAPI_AUTO_LENGTH,
+      &resourceName
+    );
+
+    const napi_status createStatus = napi_create_async_work(
+      env,
+      nullptr,
+      resourceName,
+      ExecuteCaptureMjpeg,
+      CompleteCaptureMjpeg,
+      data,
+      &data->work
+    );
+
+    if (createStatus != napi_ok) {
+      napi_reject_deferred(
+        env,
+        data->deferred,
+        CreateNodeError(
+          env,
+          "NODE_WEBCAM_NATIVE_CAPTURE_FAILED",
+          "Unable to create native V4L2 async capture work"
+        )
+      );
+      delete data;
+
+      return promise;
+    }
+
+    const napi_status queueStatus = napi_queue_async_work(env, data->work);
+
+    if (queueStatus != napi_ok) {
+      napi_delete_async_work(env, data->work);
+      napi_reject_deferred(
+        env,
+        data->deferred,
+        CreateNodeError(
+          env,
+          "NODE_WEBCAM_NATIVE_CAPTURE_FAILED",
+          "Unable to queue native V4L2 async capture work"
+        )
+      );
+      delete data;
+    }
+
+    return promise;
+  }
+
   // Register the native functions on module.exports.
   napi_value Init(napi_env env, napi_value exports) {
     napi_property_descriptor properties[] = {
@@ -599,10 +730,20 @@ namespace {
         nullptr,
         napi_default,
         nullptr
+      },
+      {
+        "captureMjpegAsync",
+        nullptr,
+        CaptureMjpegAsync,
+        nullptr,
+        nullptr,
+        nullptr,
+        napi_default,
+        nullptr
       }
     };
 
-    napi_define_properties(env, exports, 2, properties);
+    napi_define_properties(env, exports, 3, properties);
 
     return exports;
   }

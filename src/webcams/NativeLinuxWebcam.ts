@@ -140,7 +140,7 @@ class NativeLinuxWebcam extends BaseWebcam {
       run: async () => {
         try {
           return {
-            buffer: this.#addon.captureMjpeg(nativeOptions),
+            buffer: await this.#addon.captureMjpegAsync(nativeOptions),
             kind: 'buffer',
             mimeType: this.getCaptureMimeType()
           }

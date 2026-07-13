@@ -11,6 +11,7 @@ export type NativeV4l2Options = {
 
 export type NativeWebcamAddon = {
   captureMjpeg(options: NativeV4l2Options): Buffer
+  captureMjpegAsync(options: NativeV4l2Options): Promise<Buffer>
   isAvailable(options: NativeV4l2Options): boolean
 }
 
@@ -34,8 +35,10 @@ const isNativeWebcamAddon = (
   candidate !== null &&
   'isAvailable' in candidate &&
   'captureMjpeg' in candidate &&
+  'captureMjpegAsync' in candidate &&
   typeof candidate.isAvailable === 'function' &&
-  typeof candidate.captureMjpeg === 'function'
+  typeof candidate.captureMjpeg === 'function' &&
+  typeof candidate.captureMjpegAsync === 'function'
 
 const loadNativeWebcamAddon = (addonPath?: string) => {
   if (process.platform !== 'linux') return undefined

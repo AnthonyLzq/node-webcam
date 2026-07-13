@@ -18,16 +18,25 @@ import type { NativeWebcamAddon } from '../src/native'
 
 const unavailableNativeAddon: NativeWebcamAddon = {
   captureMjpeg: () => Buffer.from([1, 2, 3]),
+  captureMjpegAsync: async () => Buffer.from([1, 2, 3]),
   isAvailable: () => false
 }
 
 const availableNativeAddon: NativeWebcamAddon = {
   captureMjpeg: () => Buffer.from([1, 2, 3]),
+  captureMjpegAsync: async () => Buffer.from([1, 2, 3]),
   isAvailable: () => true
 }
 
 const createFailingNativeAddon = (code: string, message: string) => ({
   captureMjpeg: () => {
+    const error = new Error(message) as Error & { code: string }
+
+    error.code = code
+
+    throw error
+  },
+  captureMjpegAsync: async () => {
     const error = new Error(message) as Error & { code: string }
 
     error.code = code
@@ -147,6 +156,25 @@ describe('create', () => {
         name: 'WebcamError'
       })
     }
+  })
+
+  it('captures through the native addon async API', async () => {
+    const webcam = new NativeLinuxWebcam({
+      nativeAddon: {
+        captureMjpeg: () => {
+          throw new Error('sync capture should not be used')
+        },
+        captureMjpegAsync: async () => Buffer.from([1, 2, 3]),
+        isAvailable: () => true
+      },
+      save: false
+    })
+
+    const result = await webcam.capture({ location: 'photo.jpeg' })
+
+    assert.equal(result.backend, 'native:v4l2')
+    assert.equal(result.backendType, 'native')
+    assert.deepEqual([...result.buffer], [1, 2, 3])
   })
 
   it('creates the macOS backend on darwin', () => {

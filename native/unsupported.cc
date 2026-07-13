@@ -23,9 +23,29 @@ namespace {
     return nullptr;
   }
 
-  // Export the two functions used by the smoke script:
+  napi_value CaptureMjpegAsync(napi_env env, napi_callback_info) {
+    napi_deferred deferred;
+    napi_value promise;
+    napi_value message;
+    napi_value error;
+
+    napi_create_promise(env, &deferred, &promise);
+    napi_create_string_utf8(
+      env,
+      "Native webcam capture is only implemented on Linux in this spike",
+      NAPI_AUTO_LENGTH,
+      &message
+    );
+    napi_create_error(env, nullptr, message, &error);
+    napi_reject_deferred(env, deferred, error);
+
+    return promise;
+  }
+
+  // Export the functions used by the smoke script and runtime loader:
   // - isAvailable(options)
   // - captureMjpeg(options)
+  // - captureMjpegAsync(options)
   napi_value Init(napi_env env, napi_value exports) {
     napi_property_descriptor properties[] = {
       {
@@ -47,10 +67,20 @@ namespace {
         nullptr,
         napi_default,
         nullptr
+      },
+      {
+        "captureMjpegAsync",
+        nullptr,
+        CaptureMjpegAsync,
+        nullptr,
+        nullptr,
+        nullptr,
+        napi_default,
+        nullptr
       }
     };
 
-    napi_define_properties(env, exports, 2, properties);
+    napi_define_properties(env, exports, 3, properties);
 
     return exports;
   }
