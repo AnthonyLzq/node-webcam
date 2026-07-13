@@ -10,6 +10,7 @@
 #include <unistd.h>
 
 #include <algorithm>
+#include <chrono>
 #include <cstdint>
 #include <stdexcept>
 #include <string>
@@ -21,6 +22,7 @@ namespace {
   constexpr uint32_t DEFAULT_HEIGHT = 720;
   constexpr uint32_t DEFAULT_TIMEOUT_MS = 2000;
   constexpr const char* DEFAULT_DEVICE = "/dev/video0";
+  using Clock = std::chrono::steady_clock;
 
   struct NativeOptions {
     std::string device = DEFAULT_DEVICE;
@@ -440,7 +442,27 @@ namespace {
 
   // Step 5: wait until the device signals that at least one queued buffer has
   // frame data available.
-  void WaitForFrame(int fd, uint32_t timeoutMs) {
+  uint32_t GetRemainingTimeoutMs(Clock::time_point deadline) {
+    const auto now = Clock::now();
+
+    if (now >= deadline) return 0;
+
+    const auto remaining =
+      std::chrono::duration_cast<std::chrono::milliseconds>(deadline - now)
+        .count();
+
+    return static_cast<uint32_t>(std::max<int64_t>(1, remaining));
+  }
+
+  void WaitForFrame(int fd, Clock::time_point deadline) {
+    const uint32_t timeoutMs = GetRemainingTimeoutMs(deadline);
+
+    if (timeoutMs == 0)
+      throw NativeCaptureError(
+        "NODE_WEBCAM_NATIVE_FRAME_TIMEOUT",
+        "Timed out waiting for V4L2 frame"
+      );
+
     pollfd descriptor = {};
     descriptor.fd = fd;
     descriptor.events = POLLIN;
@@ -497,10 +519,12 @@ namespace {
       );
 
     bool streaming = true;
+    const auto deadline =
+      Clock::now() + std::chrono::milliseconds(options.timeoutMs);
 
     try {
       for (;;) {
-        WaitForFrame(device.get(), options.timeoutMs);
+        WaitForFrame(device.get(), deadline);
 
         v4l2_buffer buffer = {};
         buffer.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
@@ -614,7 +638,7 @@ namespace {
     } catch (const std::exception& error) {
       data->errorCode = "NODE_WEBCAM_NATIVE_CAPTURE_FAILED";
       data->errorMessage = error.what();
-      }
+    }
   }
 
   void CompleteCaptureMjpeg(napi_env env, napi_status status, void* rawData) {
