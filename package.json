@@ -5,7 +5,7 @@
   "main": "dist/cjs/index.js",
   "module": "dist/esm/index.js",
   "engines": {
-    "node": ">=22"
+    "node": ">=20.9.0"
   },
   "scripts": {
     "build": "npm run rm:dist && npm run build:cjs && npm run build:esm && npm run build:types && node scripts/prepare-esm.js && node scripts/copy-bindings.js",
@@ -89,7 +89,7 @@
   },
   "homepage": "https://github.com/AnthonyLzq/node-webcam#readme",
   "devDependencies": {
-    "@types/node": "22.20.0",
+    "@types/node": "^20.19.43",
     "@types/ws": "^8.5.3",
     "@typescript-eslint/eslint-plugin": "^5.47.1",
     "@typescript-eslint/parser": "^5.47.1",

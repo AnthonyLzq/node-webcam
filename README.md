@@ -6,7 +6,7 @@ Cross platform webcam usage
 
 ### Requirements
 
-- Node.js `>=22`.
+- Node.js `>=20.9.0`.
 
 | Platform | Built-in/native path | Optional fallback requirements | Notes |
 | --- | --- | --- | --- |
