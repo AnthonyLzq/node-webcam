@@ -133,6 +133,27 @@ tmp/benchmarks/<run-id>/results.md
 
 ### API Usage
 
+All supported public APIs are exported from the package root:
+
+```ts
+import {
+  capture,
+  create,
+  defaults,
+  getMetricsReport,
+  listWebcams,
+  resetMetrics,
+  WebcamError,
+  type NodeWebcamConfig,
+  type WebcamCaptureResult
+} from '@anthonylzq/node-webcam'
+```
+
+Deep imports such as `@anthonylzq/node-webcam/dist/*` are intentionally not
+supported. The package uses an explicit `exports` map so internal build layout,
+native bindings, and backend implementations can change without becoming public
+API.
+
 - The simplest use case:
 
   ```ts

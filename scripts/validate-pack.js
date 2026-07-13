@@ -4,6 +4,7 @@ const { execFileSync } = require('child_process')
 const {
   existsSync,
   mkdtempSync,
+  readFileSync,
   rmSync,
   writeFileSync
 } = require('fs')
@@ -51,6 +52,7 @@ try {
   const pack = parsePackOutput(exec('npm', ['pack', '--json', '--ignore-scripts']))
   tarballPath = join(root, pack.filename)
   const packageEntries = pack.files.map(file => file.path)
+  const packageJson = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
   const forbiddenEntries = packageEntries.filter(entry =>
     forbiddenPackageEntries.test(entry)
   )
@@ -76,6 +78,9 @@ try {
 
   if (nativePrebuildEntries.length === 0)
     throw new Error('Required Linux native prebuild missing from package tarball')
+
+  if (JSON.stringify(Object.keys(packageJson.exports ?? {})) !== JSON.stringify(['.']))
+    throw new Error('Package exports must remain root-only until public subpaths are approved')
 
   if (untaggedLinuxPrebuildEntries.length > 0)
     throw new Error(
