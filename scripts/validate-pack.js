@@ -234,8 +234,7 @@ try {
           moduleResolution: 'node16',
           skipLibCheck: true,
           strict: true,
-          target: 'ES2020',
-          typeRoots: [join(root, 'node_modules', '@types')]
+          target: 'ES2020'
         },
         include: ['index.ts', 'index.mts']
       },
