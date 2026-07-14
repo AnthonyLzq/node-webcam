@@ -1,15 +1,20 @@
 import os from 'os'
 import { spawnSync } from 'child_process'
-import { existsSync } from 'fs'
 
 import { WebcamError } from '../errors'
 import type { WebcamConfig } from '../types'
-import { getPlatformCameras } from '../utils'
+import { getPlatformCameras, isLinuxCaptureDevice } from '../utils'
 import { BaseWebcam, WebcamCommand } from './BaseWebcam'
 
 type FFmpegPlatform = 'darwin' | 'linux' | 'win32'
+type FFmpegAvailabilityOptions = Partial<WebcamConfig> & {
+  ffmpegProbeTimeout?: number
+  linuxCaptureDeviceProbe?: (device: string) => boolean
+}
 
 const supportedFFmpegPlatforms = ['darwin', 'linux', 'win32']
+const defaultFFmpegProbeTimeoutMs = 2_000
+const windowsCommandCamDeviceNumberPattern = /^[1-9]\d*$/
 
 const isFFmpegPlatform = (platform: string): platform is FFmpegPlatform =>
   supportedFFmpegPlatforms.includes(platform)
@@ -37,23 +42,35 @@ class FFmpegWebcam extends BaseWebcam {
   }
 
   static isAvailable(
-    options: Partial<WebcamConfig> = {},
+    options: FFmpegAvailabilityOptions = {},
     platform = os.platform()
   ) {
     if (!isFFmpegPlatform(platform)) return false
 
     const device = FFmpegWebcam.getDevice(options, platform)
 
-    if (platform === 'win32' && !device) return false
+    if (platform === 'darwin' && !device) return false
 
-    if (platform === 'linux' && !existsSync(device)) return false
+    if (platform === 'win32') {
+      if (!device) return false
+      if (windowsCommandCamDeviceNumberPattern.test(device)) return false
+    }
+
+    if (
+      platform === 'linux' &&
+      !isLinuxCaptureDevice({
+        device,
+        isCaptureDevice: options.linuxCaptureDeviceProbe
+      })
+    )
+      return false
 
     const bin =
       options.ffmpegPath || process.env.NODE_WEBCAM_FFMPEG_PATH || 'ffmpeg'
 
     const result = spawnSync(bin, FFmpegWebcam.getAvailabilityProbeArgs(), {
       stdio: 'ignore',
-      timeout: options.timeout && options.timeout > 0 ? options.timeout : 0
+      timeout: FFmpegWebcam.getAvailabilityProbeTimeout(options)
     })
 
     return result.status === 0
@@ -68,12 +85,21 @@ class FFmpegWebcam extends BaseWebcam {
     return ['-version']
   }
 
+  static getAvailabilityProbeTimeout(options: FFmpegAvailabilityOptions = {}) {
+    if (options.ffmpegProbeTimeout && options.ffmpegProbeTimeout > 0)
+      return options.ffmpegProbeTimeout
+
+    if (options.timeout && options.timeout > 0)
+      return Math.min(options.timeout, defaultFFmpegProbeTimeoutMs)
+
+    return defaultFFmpegProbeTimeoutMs
+  }
+
   static getDevice(options: Partial<WebcamConfig>, platform: FFmpegPlatform) {
     if (typeof options.device === 'string' && options.device.trim())
       return options.device.trim()
 
     if (platform === 'linux') return '/dev/video0'
-    if (platform === 'darwin') return 'default'
 
     return ''
   }
@@ -96,6 +122,12 @@ class FFmpegWebcam extends BaseWebcam {
         args.push('-f', 'video4linux2', '-i', device)
         break
       case 'darwin':
+        if (!device)
+          throw new WebcamError({
+            code: 'COMMAND_FAILED',
+            message: 'FFmpeg AVFoundation capture requires a device name'
+          })
+
         args.push('-f', 'avfoundation', '-i', `${device}:none`)
         break
       case 'win32':

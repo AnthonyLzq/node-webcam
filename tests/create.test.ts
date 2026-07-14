@@ -265,9 +265,17 @@ describe('create', () => {
     mock.method(os, 'platform', () => 'darwin')
     mock.method(FFmpegWebcam, 'isAvailable', () => true)
 
-    const webcam = create()
+    const webcam = create({ device: 'FaceTime HD Camera' })
 
     assert.ok(webcam instanceof FFmpegWebcam)
+  })
+
+  it('keeps imagesnap on macOS when no ffmpeg device is configured', () => {
+    mock.method(os, 'platform', () => 'darwin')
+
+    const webcam = create()
+
+    assert.ok(webcam instanceof ImageSnapWebcam)
   })
 
   it('keeps imagesnap on macOS when legacy-only options are requested', () => {

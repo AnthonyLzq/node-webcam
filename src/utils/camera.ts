@@ -35,6 +35,12 @@ type GetLinuxCamerasOptions = {
   nativeAddon?: Pick<NativeWebcamAddon, 'isCaptureDevice'>
 }
 
+type IsLinuxCaptureDeviceOptions = {
+  device: string
+  isCaptureDevice?: LinuxCameraCapabilityProbe
+  nativeAddon?: Pick<NativeWebcamAddon, 'isCaptureDevice'>
+}
+
 const createLinuxCameraCapabilityProbe = (
   addon: Pick<NativeWebcamAddon, 'isCaptureDevice'>
 ): LinuxCameraCapabilityProbe => {
@@ -49,6 +55,34 @@ const getDefaultLinuxCameraCapabilityProbe = () => {
   return createLinuxCameraCapabilityProbe(addon)
 }
 
+const getLinuxCameraCapabilityProbe = ({
+  isCaptureDevice,
+  nativeAddon
+}: Pick<IsLinuxCaptureDeviceOptions, 'isCaptureDevice' | 'nativeAddon'>) =>
+  isCaptureDevice ??
+  (nativeAddon
+    ? createLinuxCameraCapabilityProbe(nativeAddon)
+    : getDefaultLinuxCameraCapabilityProbe())
+
+const isLinuxCaptureDevice = ({
+  device,
+  isCaptureDevice,
+  nativeAddon
+}: IsLinuxCaptureDeviceOptions) => {
+  const canCapture = getLinuxCameraCapabilityProbe({
+    isCaptureDevice,
+    nativeAddon
+  })
+
+  if (!canCapture) return fs.existsSync(device)
+
+  try {
+    return canCapture(device)
+  } catch (_error) {
+    return false
+  }
+}
+
 const getLinuxCameras = ({
   deviceDirectory = '/dev',
   isCaptureDevice,
@@ -61,11 +95,10 @@ const getLinuxCameras = ({
     .sort((left, right) =>
       left.localeCompare(right, undefined, { numeric: true })
     )
-  const canCapture =
-    isCaptureDevice ??
-    (nativeAddon
-      ? createLinuxCameraCapabilityProbe(nativeAddon)
-      : getDefaultLinuxCameraCapabilityProbe())
+  const canCapture = getLinuxCameraCapabilityProbe({
+    isCaptureDevice,
+    nativeAddon
+  })
 
   if (!canCapture) return cameras
 
@@ -209,6 +242,7 @@ export {
   getDefaultWindowsListCommand,
   getImageSnapListCommand,
   getLinuxCameras,
+  isLinuxCaptureDevice,
   getPlatformCameras,
   getWindowsListCommand,
   parseImageSnapCameras,

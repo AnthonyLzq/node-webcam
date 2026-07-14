@@ -322,6 +322,7 @@ describe('backend command generation', () => {
             device,
             ffmpegPath: ffmpeg,
             height: 480,
+            linuxCaptureDeviceProbe: () => true,
             width: 640
           },
           'linux'
@@ -351,7 +352,10 @@ describe('backend command generation', () => {
 
     try {
       assert.equal(
-        FFmpegWebcam.isAvailable({ device, ffmpegPath: ffmpeg }, 'linux'),
+        FFmpegWebcam.isAvailable(
+          { device, ffmpegPath: ffmpeg, linuxCaptureDeviceProbe: () => true },
+          'linux'
+        ),
         false
       )
     } finally {
@@ -359,6 +363,80 @@ describe('backend command generation', () => {
       rmSync(directory, { force: true, recursive: true })
     }
   })
+
+  posixIt('does not run ffmpeg when the Linux device is not capturable', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'node-webcam-ffmpeg-'))
+    const ffmpeg = join(directory, 'ffmpeg')
+    const device = join(directory, 'video0')
+    const argsPath = join(directory, 'args.json')
+    const originalArgsPath = process.env.NODE_WEBCAM_FFMPEG_ARGS_PATH
+
+    writeFileSync(device, '')
+    writeFileSync(
+      ffmpeg,
+      [
+        '#!/usr/bin/env node',
+        "require('node:fs').writeFileSync(process.env.NODE_WEBCAM_FFMPEG_ARGS_PATH, JSON.stringify(process.argv.slice(2)))"
+      ].join('\n')
+    )
+    chmodSync(ffmpeg, 0o755)
+    process.env.NODE_WEBCAM_FFMPEG_ARGS_PATH = argsPath
+
+    try {
+      assert.equal(
+        FFmpegWebcam.isAvailable(
+          {
+            device,
+            ffmpegPath: ffmpeg,
+            linuxCaptureDeviceProbe: () => false
+          },
+          'linux'
+        ),
+        false
+      )
+      assert.equal(existsSync(argsPath), false)
+    } finally {
+      if (originalArgsPath === undefined)
+        delete process.env.NODE_WEBCAM_FFMPEG_ARGS_PATH
+      else process.env.NODE_WEBCAM_FFMPEG_ARGS_PATH = originalArgsPath
+
+      rmSync(directory, { force: true, recursive: true })
+    }
+  })
+
+  posixIt(
+    'bounds ffmpeg binary probes even when capture timeout is disabled',
+    () => {
+      const directory = mkdtempSync(join(tmpdir(), 'node-webcam-ffmpeg-'))
+      const ffmpeg = join(directory, 'ffmpeg')
+      const device = join(directory, 'video0')
+
+      writeFileSync(device, '')
+      writeFileSync(
+        ffmpeg,
+        ['#!/usr/bin/env node', 'setTimeout(() => {}, 1000)'].join('\n')
+      )
+      chmodSync(ffmpeg, 0o755)
+
+      try {
+        assert.equal(
+          FFmpegWebcam.isAvailable(
+            {
+              device,
+              ffmpegPath: ffmpeg,
+              ffmpegProbeTimeout: 10,
+              linuxCaptureDeviceProbe: () => true,
+              timeout: 0
+            },
+            'linux'
+          ),
+          false
+        )
+      } finally {
+        rmSync(directory, { force: true, recursive: true })
+      }
+    }
+  )
 
   posixIt('does not run ffmpeg when the Linux device does not exist', () => {
     const directory = mkdtempSync(join(tmpdir(), 'node-webcam-ffmpeg-'))

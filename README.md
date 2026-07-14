@@ -122,8 +122,13 @@ Backend capability checks can change that order:
 Selection is re-evaluated for each `create()` call so camera hotplug, PATH,
 environment, and permission changes are not hidden by a global cache. ffmpeg
 availability is checked with `ffmpeg -version`; it does not open or capture from
-the camera during selection. `clearBackendCaches()` is exported for forwards
-compatibility and also backs the deprecated `clearBackendSelectionCache()` alias.
+the camera during selection. The probe has its own short timeout, even when
+capture `timeout` is disabled. ffmpeg selection also requires a compatible
+device signal: Linux devices must exist and pass the V4L2 capture-capability
+filter when the native probe is available, macOS requires an explicit
+AVFoundation device, and Windows numeric device strings are reserved for
+CommandCam. `clearBackendCaches()` is exported for forwards compatibility and
+also backs the deprecated `clearBackendSelectionCache()` alias.
 
 Fallback only happens while selecting a backend. If the selected backend starts
 a capture and fails because of permissions, an invalid device, a timeout, or an
