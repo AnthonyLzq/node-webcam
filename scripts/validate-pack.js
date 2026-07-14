@@ -109,11 +109,18 @@ try {
     )
 
   consumerDirectory = mkdtempSync(join(tmpdir(), 'node-webcam-consumer-'))
+  const commandCamFixturePath = join(consumerDirectory, 'CommandCam.exe')
+  const consumerEnv = {
+    ...process.env,
+    NODE_WEBCAM_COMMANDCAM_PATH: commandCamFixturePath,
+    NODE_WEBCAM_SKIP_COMMANDCAM_DOWNLOAD: '1'
+  }
 
   writeFileSync(
     join(consumerDirectory, 'package.json'),
     JSON.stringify({ name: 'node-webcam-consumer', private: true }, null, 2)
   )
+  writeFileSync(commandCamFixturePath, '')
 
   execFileSync(
     'npm',
@@ -127,6 +134,7 @@ try {
     ],
     {
       cwd: consumerDirectory,
+      env: consumerEnv,
       stdio: 'ignore'
     }
   )
@@ -192,6 +200,7 @@ try {
 
   execFileSync(process.execPath, ['index.mjs'], {
     cwd: consumerDirectory,
+    env: consumerEnv,
     stdio: 'ignore'
   })
 
@@ -251,6 +260,7 @@ try {
 
   execFileSync(process.execPath, [tscPath, '-p', 'tsconfig.json'], {
     cwd: consumerDirectory,
+    env: consumerEnv,
     stdio: 'ignore'
   })
 
@@ -261,6 +271,7 @@ try {
     ['setup', 'windows'],
     {
       cwd: consumerDirectory,
+      env: consumerEnv,
       stdio: 'ignore'
     }
   )

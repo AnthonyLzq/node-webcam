@@ -25,6 +25,8 @@
     "pack:check": "npm run check && npm run build && node scripts/validate-pack.js",
     "prepare": "npm run build",
     "prepack": "npm run check",
+    "prepublishOnly": "npm run publish:check",
+    "publish:check": "node scripts/publish-check.js",
     "typecheck": "tsc --noEmit",
     "test": "node --test -r ts-node/register \"tests/**/*.test.ts\"",
     "release": "standard-version",
