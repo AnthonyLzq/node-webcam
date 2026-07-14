@@ -36,6 +36,10 @@ change without being exposed as supported subpaths.
 
 Linux uses the bundled native V4L2 addon when a matching prebuild is available,
 then falls back to `ffmpeg` when it is installed, and finally to `fswebcam`.
+The native backend currently supports single-planar V4L2 streaming devices that
+accept MJPEG at the requested resolution exactly. Linux camera listing uses the
+same capability filter when the native addon is available, so multi-planar-only
+devices are not advertised until the capture path supports them.
 
 ```
 # Optional fallback backends

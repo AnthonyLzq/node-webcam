@@ -301,15 +301,15 @@ namespace {
     return capability.capabilities;
   }
 
-  bool HasVideoCaptureCapability(const v4l2_capability& capability) {
+  bool SupportsImplementedCapturePath(const v4l2_capability& capability) {
     const uint32_t capabilities = GetEffectiveCapabilities(capability);
 
-    return (capabilities & V4L2_CAP_VIDEO_CAPTURE) ||
-           (capabilities & V4L2_CAP_VIDEO_CAPTURE_MPLANE);
+    return (capabilities & V4L2_CAP_VIDEO_CAPTURE) &&
+           (capabilities & V4L2_CAP_STREAMING);
   }
 
-  // Step 1: verify that the file descriptor is actually a capture-capable V4L2
-  // device and that it supports streaming buffers.
+  // Step 1: verify that the file descriptor is compatible with the capture path
+  // implemented below: single-planar V4L2 video capture with streaming buffers.
   void AssertCaptureDevice(int fd, const std::string& device) {
     v4l2_capability capability = {};
 
@@ -319,18 +319,11 @@ namespace {
         "Unable to query V4L2 capabilities for " + device
       );
 
-    const uint32_t capabilities = GetEffectiveCapabilities(capability);
-
-    if (!(capabilities & V4L2_CAP_VIDEO_CAPTURE))
+    if (!SupportsImplementedCapturePath(capability))
       throw NativeCaptureError(
         "NODE_WEBCAM_NATIVE_DEVICE_UNSUPPORTED",
-        "V4L2 device does not support video capture: " + device
-      );
-
-    if (!(capabilities & V4L2_CAP_STREAMING))
-      throw NativeCaptureError(
-        "NODE_WEBCAM_NATIVE_DEVICE_UNSUPPORTED",
-        "V4L2 device does not support streaming IO: " + device
+        "V4L2 device does not support single-planar streaming video capture: " +
+          device
       );
   }
 
@@ -345,7 +338,7 @@ namespace {
     if (Xioctl(device.get(), VIDIOC_QUERYCAP, &capability) == -1)
       return false;
 
-    return HasVideoCaptureCapability(capability);
+    return SupportsImplementedCapturePath(capability);
   }
 
   // Step 2: ask the camera for MJPEG frames at the requested resolution. This is
@@ -377,6 +370,15 @@ namespace {
       throw NativeCaptureError(
         "NODE_WEBCAM_NATIVE_FORMAT_UNSUPPORTED",
         "V4L2 device did not accept MJPEG pixel format"
+      );
+
+    if (
+      format.fmt.pix.width != options.width ||
+      format.fmt.pix.height != options.height
+    )
+      throw NativeCaptureError(
+        "NODE_WEBCAM_NATIVE_FORMAT_UNSUPPORTED",
+        "V4L2 device did not accept requested MJPEG resolution"
       );
   }
 
