@@ -463,7 +463,7 @@ namespace {
 
   // Step 5: wait until the device signals that at least one queued buffer has
   // frame data available.
-  uint32_t GetRemainingTimeoutMs(Clock::time_point deadline) {
+  int GetRemainingTimeoutMs(Clock::time_point deadline) {
     const auto now = Clock::now();
 
     if (now >= deadline) return 0;
@@ -472,13 +472,18 @@ namespace {
       std::chrono::duration_cast<std::chrono::milliseconds>(deadline - now)
         .count();
 
-    return static_cast<uint32_t>(std::max<int64_t>(1, remaining));
+    return static_cast<int>(std::max<int64_t>(1, remaining));
   }
 
-  void WaitForFrame(int fd, Clock::time_point deadline) {
-    const uint32_t timeoutMs = GetRemainingTimeoutMs(deadline);
+  void WaitForFrame(
+    int fd,
+    uint32_t timeoutMs,
+    Clock::time_point deadline
+  ) {
+    const int pollTimeoutMs =
+      timeoutMs == 0 ? -1 : GetRemainingTimeoutMs(deadline);
 
-    if (timeoutMs == 0)
+    if (timeoutMs > 0 && pollTimeoutMs == 0)
       throw NativeCaptureError(
         "NODE_WEBCAM_NATIVE_FRAME_TIMEOUT",
         "Timed out waiting for V4L2 frame"
@@ -488,7 +493,7 @@ namespace {
     descriptor.fd = fd;
     descriptor.events = POLLIN;
 
-    const int result = poll(&descriptor, 1, static_cast<int>(timeoutMs));
+    const int result = poll(&descriptor, 1, pollTimeoutMs);
 
     if (result == -1)
       throw NativeSystemError(
@@ -541,11 +546,13 @@ namespace {
 
     bool streaming = true;
     const auto deadline =
-      Clock::now() + std::chrono::milliseconds(options.timeoutMs);
+      options.timeoutMs > 0
+        ? Clock::now() + std::chrono::milliseconds(options.timeoutMs)
+        : Clock::time_point{};
 
     try {
       for (;;) {
-        WaitForFrame(device.get(), deadline);
+        WaitForFrame(device.get(), options.timeoutMs, deadline);
 
         v4l2_buffer buffer = {};
         buffer.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;

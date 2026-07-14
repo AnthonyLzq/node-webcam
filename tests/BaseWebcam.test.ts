@@ -118,6 +118,18 @@ class FakeCaptureWebcam extends BaseWebcam {
   }
 }
 
+class FirstFakeBackendWebcam extends FakeCaptureWebcam {
+  protected getBackendName() {
+    return 'first-backend'
+  }
+}
+
+class SecondFakeBackendWebcam extends FakeCaptureWebcam {
+  protected getBackendName() {
+    return 'second-backend'
+  }
+}
+
 class CommandWebcam extends BaseWebcam {
   #command: WebcamCommand
 
@@ -529,6 +541,35 @@ describe('BaseWebcam', () => {
       ])
 
       assert.equal(FakeCaptureWebcam.maxActiveCaptures, 2)
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
+  })
+
+  it('serializes concurrent captures for the same device across backend names', async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'node-webcam-'))
+    const firstPath = join(directory, 'first.png')
+    const secondPath = join(directory, 'second.png')
+    const firstWebcam = new FirstFakeBackendWebcam({
+      device: '/dev/video0',
+      output: 'png',
+      saveShots: false
+    })
+    const secondWebcam = new SecondFakeBackendWebcam({
+      device: '/dev/video0',
+      output: 'png',
+      saveShots: false
+    })
+
+    FakeCaptureWebcam.resetGlobalCaptures()
+
+    try {
+      await Promise.all([
+        firstWebcam.capture({ location: firstPath }),
+        secondWebcam.capture({ location: secondPath })
+      ])
+
+      assert.equal(FakeCaptureWebcam.maxActiveCaptures, 1)
     } finally {
       rmSync(directory, { recursive: true, force: true })
     }

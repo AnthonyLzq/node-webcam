@@ -229,7 +229,7 @@ class BaseWebcam {
         : 'default'
 
     return [
-      `capture:device:${this.getBackendName()}:${device}`,
+      `capture:device:${process.platform}:${device}`,
       `capture:path:${resolve(path)}`
     ]
   }

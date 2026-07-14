@@ -228,6 +228,30 @@ describe('create', () => {
     assert.deepEqual([...result.buffer], [1, 2, 3])
   })
 
+  it('passes timeout 0 through to native captures as no timeout', async () => {
+    const capturedTimeouts: number[] = []
+    const webcam = new NativeLinuxWebcam({
+      nativeAddon: {
+        captureMjpeg: () => {
+          throw new Error('sync capture should not be used')
+        },
+        captureMjpegAsync: async options => {
+          capturedTimeouts.push(options.timeoutMs)
+
+          return Buffer.from([1, 2, 3])
+        },
+        isAvailable: () => true,
+        isCaptureDevice: () => true
+      },
+      save: false,
+      timeout: 0
+    })
+
+    await webcam.capture({ location: 'photo.jpeg' })
+
+    assert.deepEqual(capturedTimeouts, [0])
+  })
+
   it('creates the macOS backend on darwin', () => {
     mock.method(os, 'platform', () => 'darwin')
     mock.method(FFmpegWebcam, 'isAvailable', () => false)

@@ -90,13 +90,10 @@ class NativeLinuxWebcam extends BaseWebcam {
         ? options.device
         : '/dev/video0'
 
-    const timeoutMs =
-      options.timeout && options.timeout > 0 ? options.timeout : 5000
-
     return addon.isAvailable({
       device,
       height: options.height ?? 720,
-      timeoutMs,
+      timeoutMs: options.timeout && options.timeout > 0 ? options.timeout : 0,
       width: options.width ?? 1280
     })
   }
@@ -123,11 +120,10 @@ class NativeLinuxWebcam extends BaseWebcam {
       typeof options.device === 'string' && options.device
         ? options.device
         : '/dev/video0'
-    const timeoutMs = options.timeout > 0 ? options.timeout : 5_000
     const nativeOptions = {
       device,
       height: options.height,
-      timeoutMs,
+      timeoutMs: options.timeout,
       width: options.width
     }
 

@@ -53,7 +53,7 @@ class FFmpegWebcam extends BaseWebcam {
 
     const result = spawnSync(bin, FFmpegWebcam.getAvailabilityProbeArgs(), {
       stdio: 'ignore',
-      timeout: options.timeout && options.timeout > 0 ? options.timeout : 2_000
+      timeout: options.timeout && options.timeout > 0 ? options.timeout : 0
     })
 
     return result.status === 0
