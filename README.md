@@ -135,8 +135,11 @@ capture `timeout` is disabled. ffmpeg selection also requires a compatible
 device signal: Linux devices must exist and pass the V4L2 capture-capability
 filter when the native probe is available, macOS requires an explicit
 AVFoundation device, and Windows numeric device strings are reserved for
-CommandCam. `clearBackendCaches()` is exported for forwards compatibility and
-also backs the deprecated `clearBackendSelectionCache()` alias.
+CommandCam. The non-destructive ffmpeg check does not prove that a DirectShow or
+AVFoundation device name exists; invalid names fail during capture and do not
+trigger another backend fallback after capture has started. `clearBackendCaches()`
+is exported for forwards compatibility and also backs the deprecated
+`clearBackendSelectionCache()` alias.
 
 Fallback only happens while selecting a backend. If the selected backend starts
 a capture and fails because of permissions, an invalid device, a timeout, or an
@@ -333,8 +336,7 @@ API.
 
 ## Maintainer packaging
 
-Publishing is manual. Do not use a plain `npm pack` artifact as a release
-candidate. Run:
+Publishing is manual. The only supported release-candidate command is:
 
 ```bash
 npm run publish:check
@@ -344,6 +346,8 @@ That command rebuilds the Linux x64 glibc native prebuild, writes
 `prebuilds/native-manifest.json`, and runs the package validator. The validator
 checks that the manifest hashes match the native sources, `binding.gyp`, and the
 bundled `.node` prebuild so stale native artifacts fail before publication.
+Direct `npm pack` runs a `prepack` freshness check, but it does not rebuild the
+native prebuild; use it only for local inspection, not publication.
 
 ## Author
 

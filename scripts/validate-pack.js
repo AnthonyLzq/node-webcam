@@ -13,19 +13,16 @@ const { tmpdir } = require('os')
 const { join, resolve } = require('path')
 
 const root = resolve(__dirname, '..')
-const forbiddenPackageEntries = /^(?:\.goals|docs|examples|src|tests|tsconfig|\.(?:github|vscode))(?:\/|$)/
+const forbiddenPackageEntries = /^(?:\.goals|docs|examples|src|tests|tsconfig|binding\.gyp|native|\.(?:github|vscode))(?:\/|$)/
 const requiredPackageEntries = [
   'LICENSE',
   'README.md',
   'bin/node-webcam.js',
   'bin/setup.js',
-  'binding.gyp',
   'dist/cjs/index.js',
   'dist/esm/index.js',
   'dist/esm/package.json',
   'dist/types/index.d.ts',
-  'native/linux_v4l2.cc',
-  'native/unsupported.cc',
   'package.json',
   'prebuilds/native-manifest.json'
 ]
@@ -96,12 +93,21 @@ const assertNativeManifest = ({ nativePrebuildEntries, packageEntries }) => {
       )}`
     )
 
-  for (const entry of [...sourceEntries, ...prebuildEntries]) {
+  for (const entry of sourceEntries) {
+    const expectedHash = manifest.sources[entry]
+    const actualHash = sha256(entry)
+
+    if (expectedHash !== actualHash)
+      throw new Error(
+        `Native manifest hash mismatch for ${entry}: expected ${expectedHash}, received ${actualHash}`
+      )
+  }
+
+  for (const entry of prebuildEntries) {
     if (!packageEntries.includes(entry))
       throw new Error(`Native manifest entry missing from package: ${entry}`)
 
-    const expectedHash =
-      manifest.sources[entry] ?? manifest.prebuilds[entry]
+    const expectedHash = manifest.prebuilds[entry]
     const actualHash = sha256(entry)
 
     if (expectedHash !== actualHash)
@@ -139,6 +145,7 @@ try {
     String(packageJson.version).split('.')[0],
     10
   )
+  const smokeOutput = process.platform === 'win32' ? 'bmp' : 'jpeg'
 
   if (forbiddenEntries.length > 0)
     throw new Error(
@@ -245,12 +252,13 @@ try {
         "for (const key of ['capture', 'clearBackendCaches', 'create', 'list', 'listWebcams', 'getMetricsReport', 'resetMetrics']) {",
         "  if (typeof webcam[key] !== 'function') throw new Error(`Missing export: ${key}`)",
         '}',
-        "const instance = webcam.create({ output: 'jpeg', saveShots: false })",
+        `const instance = webcam.create({ output: '${smokeOutput}', saveShots: false })`,
         "if (!['ffmpeg', 'native', 'legacy'].includes(instance.getBackendType())) throw new Error('Unexpected backend type')"
       ].join('\n')
     ],
     {
       cwd: consumerDirectory,
+      env: consumerEnv,
       stdio: 'ignore'
     }
   )
@@ -262,7 +270,7 @@ try {
       "for (const key of ['capture', 'clearBackendCaches', 'create', 'list', 'listWebcams', 'getMetricsReport', 'resetMetrics']) {",
       "  if (typeof webcam[key] !== 'function') throw new Error(`Missing ESM export: ${key}`)",
       '}',
-      "const instance = webcam.create({ output: 'jpeg', saveShots: false })",
+      `const instance = webcam.create({ output: '${smokeOutput}', saveShots: false })`,
       "if (!['ffmpeg', 'native', 'legacy'].includes(instance.getBackendType())) throw new Error('Unexpected ESM backend type')"
     ].join('\n')
   )
