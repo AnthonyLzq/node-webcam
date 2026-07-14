@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 const { execFileSync } = require('child_process')
+const { createHash } = require('crypto')
 const {
   existsSync,
   mkdtempSync,
@@ -25,7 +26,13 @@ const requiredPackageEntries = [
   'dist/types/index.d.ts',
   'native/linux_v4l2.cc',
   'native/unsupported.cc',
-  'package.json'
+  'package.json',
+  'prebuilds/native-manifest.json'
+]
+const requiredNativeManifestSources = [
+  'binding.gyp',
+  'native/linux_v4l2.cc',
+  'native/unsupported.cc'
 ]
 
 const exec = (command, args, options = {}) =>
@@ -42,6 +49,66 @@ const parsePackOutput = output => {
   if (start === -1) throw new Error(`Unable to parse npm pack output: ${output}`)
 
   return JSON.parse(output.slice(start))[0]
+}
+
+const sha256 = entry =>
+  createHash('sha256')
+    .update(readFileSync(join(root, ...entry.split('/'))))
+    .digest('hex')
+
+const assertObject = (value, label) => {
+  if (typeof value !== 'object' || value === null || Array.isArray(value))
+    throw new Error(`Invalid native manifest ${label}`)
+}
+
+const assertNativeManifest = ({ nativePrebuildEntries, packageEntries }) => {
+  const manifestEntry = 'prebuilds/native-manifest.json'
+  const manifest = JSON.parse(readFileSync(join(root, manifestEntry), 'utf8'))
+
+  assertObject(manifest, 'root')
+  assertObject(manifest.sources, 'sources')
+  assertObject(manifest.prebuilds, 'prebuilds')
+
+  if (manifest.version !== 1)
+    throw new Error(`Unsupported native manifest version: ${manifest.version}`)
+
+  if (manifest.algorithm !== 'sha256')
+    throw new Error(
+      `Unsupported native manifest algorithm: ${manifest.algorithm}`
+    )
+
+  const sourceEntries = Object.keys(manifest.sources).sort()
+  const prebuildEntries = Object.keys(manifest.prebuilds).sort()
+  const expectedSourceEntries = [...requiredNativeManifestSources].sort()
+  const expectedPrebuildEntries = [...nativePrebuildEntries].sort()
+
+  if (JSON.stringify(sourceEntries) !== JSON.stringify(expectedSourceEntries))
+    throw new Error(
+      `Native manifest sources must be exactly: ${requiredNativeManifestSources.join(
+        ', '
+      )}`
+    )
+
+  if (JSON.stringify(prebuildEntries) !== JSON.stringify(expectedPrebuildEntries))
+    throw new Error(
+      `Native manifest prebuild entries do not match package prebuilds: ${prebuildEntries.join(
+        ', '
+      )}`
+    )
+
+  for (const entry of [...sourceEntries, ...prebuildEntries]) {
+    if (!packageEntries.includes(entry))
+      throw new Error(`Native manifest entry missing from package: ${entry}`)
+
+    const expectedHash =
+      manifest.sources[entry] ?? manifest.prebuilds[entry]
+    const actualHash = sha256(entry)
+
+    if (expectedHash !== actualHash)
+      throw new Error(
+        `Native manifest hash mismatch for ${entry}: expected ${expectedHash}, received ${actualHash}`
+      )
+  }
 }
 
 let tarballPath
@@ -92,6 +159,8 @@ try {
 
   if (nativePrebuildEntries.length === 0)
     throw new Error('Required Linux native prebuild missing from package tarball')
+
+  assertNativeManifest({ nativePrebuildEntries, packageEntries })
 
   if (!Number.isFinite(packageMajorVersion) || packageMajorVersion < 3)
     throw new Error(

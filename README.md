@@ -327,6 +327,20 @@ API.
   resetMetrics()
   ```
 
+## Maintainer packaging
+
+Publishing is manual. Do not use a plain `npm pack` artifact as a release
+candidate. Run:
+
+```bash
+npm run publish:check
+```
+
+That command rebuilds the Linux x64 glibc native prebuild, writes
+`prebuilds/native-manifest.json`, and runs the package validator. The validator
+checks that the manifest hashes match the native sources, `binding.gyp`, and the
+bundled `.node` prebuild so stale native artifacts fail before publication.
+
 ## Author
 
 - **Charlie Abeling** - _Initial Work_ - _Documentation_ - [chuckfairy](https://github.com/chuckfairy).
