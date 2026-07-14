@@ -4,6 +4,22 @@ import { getPlatformCameras, resolveCommandCamPath } from '../utils'
 import { BaseWebcam, WebcamCommand } from './BaseWebcam'
 
 const COMMAND_CAM_MAX_ARGUMENT_BYTES = 99
+const commandCamDeviceNumberPattern = /^[1-9]\d*$/
+
+const getCommandCamDeviceArgs = (device: WebcamConfig['device']) => {
+  if (typeof device !== 'string') return []
+
+  const normalizedDevice = device.trim()
+
+  if (!normalizedDevice) return []
+
+  return commandCamDeviceNumberPattern.test(normalizedDevice)
+    ? ['/devnum', normalizedDevice]
+    : ['/devname', normalizedDevice]
+}
+
+const quoteCommandCamShellArg = (arg: string) =>
+  /\s/.test(arg) ? `"${arg}"` : arg
 
 class WindowsWebcam extends BaseWebcam {
   #bin: string
@@ -22,13 +38,14 @@ class WindowsWebcam extends BaseWebcam {
     this.validateOutputPath(location)
 
     const { options } = this
-    const device = options.device ? `/devnum ${options.device}` : ''
-    const delay = options.delay ? `/delay ${options.delay}` : ''
+    const args = [
+      ...(options.delay ? ['/delay', String(options.delay)] : []),
+      ...getCommandCamDeviceArgs(options.device),
+      '/filename',
+      location
+    ]
 
-    return `${this.#bin} ${delay} ${device} /filename ${location}`.replace(
-      / +/g,
-      ' '
-    )
+    return [this.#bin, ...args.map(quoteCommandCamShellArg)].join(' ')
   }
 
   generateCommand(location: string): WebcamCommand {
@@ -38,7 +55,7 @@ class WindowsWebcam extends BaseWebcam {
     const args = []
 
     if (options.delay) args.push('/delay', String(options.delay))
-    if (options.device) args.push('/devnum', options.device)
+    args.push(...getCommandCamDeviceArgs(options.device))
 
     args.push('/filename', location)
 

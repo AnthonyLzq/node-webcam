@@ -177,6 +177,37 @@ describe('backend command generation', () => {
     })
   })
 
+  it('uses CommandCam device names for non-numeric Windows devices', () => {
+    withCommandCamPath(commandCamPath => {
+      const webcam = new WindowsWebcam({
+        device: 'Integrated Webcam'
+      })
+      const command = webcam.generateSh('photo.bmp')
+
+      assert.equal(
+        command,
+        `${commandCamPath} /devname "Integrated Webcam" /filename photo.bmp`
+      )
+      assert.deepEqual(webcam.generateCommand('photo.bmp'), {
+        file: commandCamPath,
+        args: ['/devname', 'Integrated Webcam', '/filename', 'photo.bmp']
+      })
+    })
+  })
+
+  it('treats zero as a CommandCam device name, not a device number', () => {
+    withCommandCamPath(commandCamPath => {
+      const webcam = new WindowsWebcam({
+        device: '0'
+      })
+
+      assert.deepEqual(webcam.generateCommand('photo.bmp'), {
+        file: commandCamPath,
+        args: ['/devname', '0', '/filename', 'photo.bmp']
+      })
+    })
+  })
+
   it('builds the Linux ffmpeg command', () => {
     const webcam = new FFmpegWebcam(
       {
