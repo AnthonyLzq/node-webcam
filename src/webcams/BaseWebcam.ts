@@ -613,7 +613,7 @@ class BaseWebcam {
   }
 
   getBase64FromBuffer(shotBuffer: Buffer) {
-    return `data:image/${this.#options.output};base64,${shotBuffer.toString(
+    return `data:${this.getCaptureMimeType()};base64,${shotBuffer.toString(
       'base64'
     )}`
   }

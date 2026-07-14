@@ -82,8 +82,8 @@ manually installed executable instead.
 
 ## Backend selection
 
-`capture()` and `create()` choose the first available backend for the current
-platform. The public API does not require backend selection.
+`capture()` and `create()` choose the first compatible available backend for
+the current platform. The public API does not require backend selection.
 
 ```mermaid
 flowchart LR
@@ -102,6 +102,21 @@ flowchart LR
 | Linux | `native:v4l2` -> `ffmpeg:v4l2` -> `fswebcam` |
 | macOS | `ffmpeg:avfoundation` -> `imagesnap` |
 | Windows | `ffmpeg:dshow` -> `CommandCam` |
+
+Backend capability checks can change that order:
+
+| Requested options | Eligible backends |
+| --- | --- |
+| Basic snapshots (`width`, `height`, `output`, `device`, `timeout`, `save`) | Native and ffmpeg backends are considered first when supported by the platform. |
+| Legacy capture options (`quality`, `delay`, `frames`, `title`, `subtitle`, `timestamp`, `greyScale`, `rotation`, `topBanner`, `bottomBanner`, `skip`) | Legacy backends only: `fswebcam`, `imagesnap`, or `CommandCam`. |
+| Explicit `ffmpegPath` on Linux | Skips native Linux and checks ffmpeg first. |
+| `signal` cancellation | Uses command backends; native Linux capture is skipped because the addon does not yet accept `AbortSignal`. |
+
+Selection is re-evaluated for each `create()` call so camera hotplug, PATH,
+environment, and permission changes are not hidden by a global cache. ffmpeg
+availability is checked with `ffmpeg -version`; it does not open or capture from
+the camera during selection. `clearBackendCaches()` is exported for forwards
+compatibility and also backs the deprecated `clearBackendSelectionCache()` alias.
 
 Fallback only happens while selecting a backend. If the selected backend starts
 a capture and fails because of permissions, an invalid device, a timeout, or an
@@ -156,6 +171,7 @@ All supported public APIs are exported from the package root:
 ```ts
 import {
   capture,
+  clearBackendCaches,
   create,
   defaults,
   getMetricsReport,

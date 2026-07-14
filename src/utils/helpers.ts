@@ -95,6 +95,13 @@ const validateBoolean = (config: WebcamConfig, option: keyof WebcamConfig) => {
   if (typeof value !== 'boolean') throwInvalidOption(option, 'a boolean', value)
 }
 
+const isAbortSignalLike = (value: unknown): value is AbortSignal =>
+  typeof value === 'object' &&
+  value !== null &&
+  typeof (value as { aborted?: unknown }).aborted === 'boolean' &&
+  typeof (value as { addEventListener?: unknown }).addEventListener ===
+    'function'
+
 const validateWebcamConfig = (config: WebcamConfig) => {
   validateFiniteNumber(config, 'width', { integer: true, min: 1, max: 16_384 })
   validateFiniteNumber(config, 'height', { integer: true, min: 1, max: 16_384 })
@@ -131,10 +138,7 @@ const validateWebcamConfig = (config: WebcamConfig) => {
   if (config.ffmpegPath !== undefined && typeof config.ffmpegPath !== 'string')
     throwInvalidOption('ffmpegPath', 'a string', config.ffmpegPath)
 
-  if (
-    config.signal !== undefined &&
-    (typeof config.signal !== 'object' || config.signal === null)
-  )
+  if (config.signal !== undefined && !isAbortSignalLike(config.signal))
     throwInvalidOption('signal', 'an AbortSignal-like object', config.signal)
 }
 

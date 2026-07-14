@@ -196,7 +196,8 @@ describe('BaseWebcam', () => {
       ['output', { output: 'gif' as unknown as 'jpeg' }],
       ['device', { device: true as unknown as string }],
       ['save', { save: 'yes' as unknown as true }],
-      ['ffmpegPath', { ffmpegPath: false as unknown as string }]
+      ['ffmpegPath', { ffmpegPath: false as unknown as string }],
+      ['signal', { signal: { aborted: false } as unknown as AbortSignal }]
     ]
 
     for (const [option, config] of cases)
@@ -394,6 +395,25 @@ describe('BaseWebcam', () => {
       assert.deepEqual([...webcam.getLastShotBuffer()], [1, 2, 3])
       assert.deepEqual([...webcam.getShotBuffer(0)], [1, 2, 3])
       assert.equal(webcam.getLastShotBase64(), 'data:image/png;base64,AQID')
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
+  })
+
+  it('uses jpeg MIME type for legacy base64 helpers with jpg output', async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'node-webcam-'))
+    const path = join(directory, 'photo.jpg')
+    const webcam = createWriteImageWebcam(path, { output: 'jpg' })
+
+    try {
+      await webcam.capture({ location: path })
+
+      assert.equal(webcam.getLastShotBase64(), 'data:image/jpeg;base64,AQID')
+      assert.equal(webcam.getBase64(0), 'data:image/jpeg;base64,AQID')
+      assert.equal(
+        webcam.getBase64FromBuffer(Buffer.from([1, 2, 3])),
+        'data:image/jpeg;base64,AQID'
+      )
     } finally {
       rmSync(directory, { recursive: true, force: true })
     }
