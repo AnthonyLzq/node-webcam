@@ -248,6 +248,18 @@ describe('camera listing', () => {
     }
   })
 
+  it('rejects fractional camera listing timeouts before execution', async () => {
+    await assert.rejects(
+      () => getPlatformCameras({ platform: 'darwin', timeout: 0.5 }),
+      {
+        code: 'INVALID_CONFIG_OPTION',
+        message:
+          'Invalid webcam option "timeout": expected an integer, received 0.5',
+        name: 'WebcamError'
+      }
+    )
+  })
+
   posixIt('wraps aborted camera listing commands', async () => {
     const directory = mkdtempSync(join(tmpdir(), 'node-webcam-commandcam-'))
     const commandCam = join(directory, 'CommandCam')

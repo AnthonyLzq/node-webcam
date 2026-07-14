@@ -187,6 +187,7 @@ describe('BaseWebcam', () => {
     > = [
       ['width', { width: 0 }],
       ['height', { height: Number.NaN }],
+      ['timeout', { timeout: 0.5 }],
       ['frames', { frames: 0 }],
       ['delay', { delay: -1 }],
       ['quality', { quality: 101 }],
@@ -197,7 +198,16 @@ describe('BaseWebcam', () => {
       ['device', { device: true as unknown as string }],
       ['save', { save: 'yes' as unknown as true }],
       ['ffmpegPath', { ffmpegPath: false as unknown as string }],
-      ['signal', { signal: { aborted: false } as unknown as AbortSignal }]
+      ['signal', { signal: { aborted: false } as unknown as AbortSignal }],
+      [
+        'signal removeEventListener',
+        {
+          signal: {
+            aborted: false,
+            addEventListener: () => undefined
+          } as unknown as AbortSignal
+        }
+      ]
     ]
 
     for (const [option, config] of cases)

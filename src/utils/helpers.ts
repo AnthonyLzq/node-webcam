@@ -95,11 +95,30 @@ const validateBoolean = (config: WebcamConfig, option: keyof WebcamConfig) => {
   if (typeof value !== 'boolean') throwInvalidOption(option, 'a boolean', value)
 }
 
+const validateTimeoutOption = (timeout: unknown) => {
+  if (typeof timeout !== 'number' || !Number.isFinite(timeout))
+    throwInvalidOption('timeout', 'a finite number', timeout)
+
+  const timeoutValue = timeout as number
+
+  if (!Number.isInteger(timeoutValue))
+    throwInvalidOption('timeout', 'an integer', timeoutValue)
+
+  if (timeoutValue < 0)
+    throwInvalidOption(
+      'timeout',
+      'a number greater than or equal to 0',
+      timeoutValue
+    )
+}
+
 const isAbortSignalLike = (value: unknown): value is AbortSignal =>
   typeof value === 'object' &&
   value !== null &&
   typeof (value as { aborted?: unknown }).aborted === 'boolean' &&
   typeof (value as { addEventListener?: unknown }).addEventListener ===
+    'function' &&
+  typeof (value as { removeEventListener?: unknown }).removeEventListener ===
     'function'
 
 const validateWebcamConfig = (config: WebcamConfig) => {
@@ -107,7 +126,7 @@ const validateWebcamConfig = (config: WebcamConfig) => {
   validateFiniteNumber(config, 'height', { integer: true, min: 1, max: 16_384 })
   validateFiniteNumber(config, 'quality', { integer: true, min: 0, max: 100 })
   validateFiniteNumber(config, 'delay', { min: 0, max: 3_600 })
-  validateFiniteNumber(config, 'timeout', { min: 0 })
+  validateTimeoutOption(config.timeout)
   validateFiniteNumber(config, 'frames', { integer: true, min: 1, max: 1_000 })
   validateFiniteNumber(config, 'rotation', {
     integer: true,
@@ -153,4 +172,4 @@ const setDefaults = (options: Partial<WebcamConfig> = {}): WebcamConfig => {
   return config
 }
 
-export { setDefaults, defaults, validateWebcamConfig }
+export { setDefaults, defaults, validateTimeoutOption, validateWebcamConfig }

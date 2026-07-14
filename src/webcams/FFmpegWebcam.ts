@@ -3,7 +3,11 @@ import { spawnSync } from 'child_process'
 
 import { WebcamError } from '../errors'
 import type { WebcamConfig } from '../types'
-import { getPlatformCameras, isLinuxCaptureDevice } from '../utils'
+import {
+  getPlatformCameras,
+  isLinuxCaptureDevice,
+  validateTimeoutOption
+} from '../utils'
 import { BaseWebcam, WebcamCommand } from './BaseWebcam'
 
 type FFmpegPlatform = 'darwin' | 'linux' | 'win32'
@@ -45,6 +49,8 @@ class FFmpegWebcam extends BaseWebcam {
     options: FFmpegAvailabilityOptions = {},
     platform = os.platform()
   ) {
+    validateTimeoutOption(options.timeout ?? 0)
+
     if (!isFFmpegPlatform(platform)) return false
 
     const device = FFmpegWebcam.getDevice(options, platform)
@@ -86,8 +92,11 @@ class FFmpegWebcam extends BaseWebcam {
   }
 
   static getAvailabilityProbeTimeout(options: FFmpegAvailabilityOptions = {}) {
-    if (options.ffmpegProbeTimeout && options.ffmpegProbeTimeout > 0)
-      return options.ffmpegProbeTimeout
+    if (options.ffmpegProbeTimeout !== undefined) {
+      validateTimeoutOption(options.ffmpegProbeTimeout)
+
+      if (options.ffmpegProbeTimeout > 0) return options.ffmpegProbeTimeout
+    }
 
     if (options.timeout && options.timeout > 0)
       return Math.min(options.timeout, defaultFFmpegProbeTimeoutMs)

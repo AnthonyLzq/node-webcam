@@ -11,6 +11,7 @@ import {
 } from '../errors'
 import { loadNativeWebcamAddon, type NativeWebcamAddon } from '../native'
 import { resolveCommandCamPath } from './commandCam'
+import { validateTimeoutOption } from './helpers'
 
 const asyncExecFile = promisify(execFile)
 const linuxVideoDevicePattern = /^video\d+$/i
@@ -159,6 +160,8 @@ const runCameraListCommand = async (
   { args, file }: CameraListCommand,
   { signal, timeout = 0 }: Pick<GetCamerasOptions, 'signal' | 'timeout'> = {}
 ) => {
+  validateTimeoutOption(timeout)
+
   try {
     const result = await asyncExecFile(file, args, {
       signal,
