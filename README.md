@@ -39,7 +39,10 @@ then falls back to `ffmpeg` when it is installed, and finally to `fswebcam`.
 The native backend currently supports single-planar V4L2 streaming devices that
 accept MJPEG at the requested resolution exactly. Linux camera listing uses the
 same capability filter when the native addon is available, so multi-planar-only
-devices are not advertised until the capture path supports them.
+devices are not advertised until the capture path supports them. That filter
+uses synchronous native V4L2 `open()`/`VIDIOC_QUERYCAP` calls, so avoid running
+Linux camera listing on latency-sensitive request paths if you have unreliable
+camera drivers.
 
 ```
 # Optional fallback backends
@@ -84,12 +87,13 @@ CommandCam release tag and checksum are pinned in `package.json` and only need
 updates when that binary changes. Set `NODE_WEBCAM_COMMANDCAM_PATH` to use a
 manually installed executable instead.
 
-On Windows, `ffmpeg` uses DirectShow device names such as `"Integrated Webcam"`.
-CommandCam supports friendly names with `/devname` and 1-based numeric indexes
-with `/devnum`. Numeric strings such as `"1"` are treated as CommandCam indexes
-and skip ffmpeg selection. CommandCam only supports BMP output; requests for
-`jpeg`, `jpg`, or `png` require ffmpeg and fail clearly if the fallback would be
-CommandCam.
+On Windows, prefer device names returned by `listWebcams()` such as
+`"Integrated Webcam"`. ffmpeg interprets `device` as a DirectShow device name.
+CommandCam supports the same friendly names with `/devname` and also supports
+1-based numeric indexes with `/devnum`. Numeric strings such as `"1"` are
+treated as CommandCam indexes and skip ffmpeg selection. CommandCam only
+supports BMP output; requests for `jpeg`, `jpg`, or `png` require ffmpeg and
+fail clearly if the fallback would be CommandCam.
 
 ## Backend selection
 

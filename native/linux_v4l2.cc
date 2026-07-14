@@ -166,6 +166,11 @@ namespace {
     return result;
   }
 
+  void AssertNapiOk(napi_status status, const std::string& message) {
+    if (status != napi_ok)
+      throw NativeCaptureError("NODE_WEBCAM_NATIVE_CAPTURE_FAILED", message);
+  }
+
   napi_value CreateNodeError(
     napi_env env,
     const std::string& code,
@@ -175,12 +180,39 @@ namespace {
     napi_value errorMessage;
     napi_value errorCode;
 
-    napi_create_string_utf8(env, message.c_str(), NAPI_AUTO_LENGTH, &errorMessage);
-    napi_create_error(env, nullptr, errorMessage, &error);
-    napi_create_string_utf8(env, code.c_str(), NAPI_AUTO_LENGTH, &errorCode);
-    napi_set_named_property(env, error, "code", errorCode);
+    if (
+      napi_create_string_utf8(
+        env,
+        message.c_str(),
+        NAPI_AUTO_LENGTH,
+        &errorMessage
+      ) != napi_ok ||
+      napi_create_error(env, nullptr, errorMessage, &error) != napi_ok ||
+      napi_create_string_utf8(
+        env,
+        code.c_str(),
+        NAPI_AUTO_LENGTH,
+        &errorCode
+      ) != napi_ok ||
+      napi_set_named_property(env, error, "code", errorCode) != napi_ok
+    ) {
+      napi_get_undefined(env, &error);
+    }
 
     return error;
+  }
+
+  void RejectDeferred(
+    napi_env env,
+    napi_deferred deferred,
+    const std::string& code,
+    const std::string& message
+  ) {
+    const napi_status status =
+      napi_reject_deferred(env, deferred, CreateNodeError(env, code, message));
+
+    if (status != napi_ok)
+      napi_throw_error(env, code.c_str(), message.c_str());
   }
 
   void ThrowNodeError(
@@ -188,7 +220,10 @@ namespace {
     const std::string& code,
     const std::string& message
   ) {
-    napi_throw(env, CreateNodeError(env, code, message));
+    const napi_status status = napi_throw(env, CreateNodeError(env, code, message));
+
+    if (status != napi_ok)
+      napi_throw_error(env, code.c_str(), message.c_str());
   }
 
   /**
@@ -197,7 +232,10 @@ namespace {
   bool HasNamedProperty(napi_env env, napi_value object, const char* name) {
     bool hasProperty = false;
 
-    napi_has_named_property(env, object, name, &hasProperty);
+    AssertNapiOk(
+      napi_has_named_property(env, object, name, &hasProperty),
+      std::string("Unable to inspect native option ") + name
+    );
 
     return hasProperty;
   }
@@ -217,20 +255,29 @@ namespace {
 
     napi_value value;
 
-    napi_get_named_property(env, object, name, &value);
+    AssertNapiOk(
+      napi_get_named_property(env, object, name, &value),
+      std::string("Unable to read native option ") + name
+    );
 
     size_t length = 0;
 
-    napi_get_value_string_utf8(env, value, nullptr, 0, &length);
+    AssertNapiOk(
+      napi_get_value_string_utf8(env, value, nullptr, 0, &length),
+      std::string("Native option must be a string: ") + name
+    );
 
     std::vector<char> buffer(length + 1);
 
-    napi_get_value_string_utf8(
-      env,
-      value,
-      buffer.data(),
-      buffer.size(),
-      &length
+    AssertNapiOk(
+      napi_get_value_string_utf8(
+        env,
+        value,
+        buffer.data(),
+        buffer.size(),
+        &length
+      ),
+      std::string("Unable to decode native option ") + name
     );
 
     return std::string(buffer.data(), length);
@@ -250,10 +297,16 @@ namespace {
     if (!HasNamedProperty(env, object, name)) return defaultValue;
 
     napi_value value;
-    napi_get_named_property(env, object, name, &value);
+    AssertNapiOk(
+      napi_get_named_property(env, object, name, &value),
+      std::string("Unable to read native option ") + name
+    );
 
     uint32_t result = defaultValue;
-    napi_get_value_uint32(env, value, &result);
+    AssertNapiOk(
+      napi_get_value_uint32(env, value, &result),
+      std::string("Native option must be an unsigned integer: ") + name
+    );
 
     return result;
   }
@@ -267,14 +320,20 @@ namespace {
     size_t argc = 1;
     napi_value args[1];
 
-    napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
+    AssertNapiOk(
+      napi_get_cb_info(env, info, &argc, args, nullptr, nullptr),
+      "Unable to read native callback arguments"
+    );
 
     NativeOptions options;
 
     if (argc == 0) return options;
 
     napi_valuetype argType;
-    napi_typeof(env, args[0], &argType);
+    AssertNapiOk(
+      napi_typeof(env, args[0], &argType),
+      "Unable to inspect native callback argument"
+    );
 
     if (argType != napi_object) return options;
 
@@ -624,20 +683,36 @@ namespace {
 
   // JS export: isAvailable(options) -> boolean
   napi_value IsAvailable(napi_env env, napi_callback_info info) {
-    const NativeOptions options = ParseOptions(env, info);
     napi_value result;
+    bool available = false;
 
-    napi_get_boolean(env, IsDeviceAvailable(options), &result);
+    try {
+      const NativeOptions options = ParseOptions(env, info);
+      available = IsDeviceAvailable(options);
+    } catch (...) {
+      available = false;
+    }
+
+    if (napi_get_boolean(env, available, &result) != napi_ok)
+      return nullptr;
 
     return result;
   }
 
   // JS export: isCaptureDevice(options) -> boolean
   napi_value IsCaptureDevice(napi_env env, napi_callback_info info) {
-    const NativeOptions options = ParseOptions(env, info);
     napi_value result;
+    bool available = false;
 
-    napi_get_boolean(env, IsV4l2CaptureDevice(options), &result);
+    try {
+      const NativeOptions options = ParseOptions(env, info);
+      available = IsV4l2CaptureDevice(options);
+    } catch (...) {
+      available = false;
+    }
+
+    if (napi_get_boolean(env, available, &result) != napi_ok)
+      return nullptr;
 
     return result;
   }
@@ -649,7 +724,16 @@ namespace {
       const std::vector<uint8_t> frame = CaptureMjpegFrame(options);
       napi_value buffer;
 
-      napi_create_buffer_copy(env, frame.size(), frame.data(), nullptr, &buffer);
+      AssertNapiOk(
+        napi_create_buffer_copy(
+          env,
+          frame.size(),
+          frame.data(),
+          nullptr,
+          &buffer
+        ),
+        "Unable to create native V4L2 capture buffer"
+      );
 
       return buffer;
     } catch (const NativeCaptureError& error) {
@@ -690,25 +774,40 @@ namespace {
     }
 
     if (!data->errorMessage.empty()) {
-      napi_reject_deferred(
+      RejectDeferred(
         env,
         data->deferred,
-        CreateNodeError(env, data->errorCode, data->errorMessage)
+        data->errorCode,
+        data->errorMessage
       );
     } else {
       napi_value buffer;
 
-      napi_create_buffer_copy(
+      const napi_status bufferStatus = napi_create_buffer_copy(
         env,
         data->frame.size(),
         data->frame.data(),
         nullptr,
         &buffer
       );
-      napi_resolve_deferred(env, data->deferred, buffer);
+
+      if (bufferStatus != napi_ok) {
+        RejectDeferred(
+          env,
+          data->deferred,
+          "NODE_WEBCAM_NATIVE_CAPTURE_FAILED",
+          "Unable to create native V4L2 async capture buffer"
+        );
+      } else if (napi_resolve_deferred(env, data->deferred, buffer) != napi_ok) {
+        napi_throw_error(
+          env,
+          "NODE_WEBCAM_NATIVE_CAPTURE_FAILED",
+          "Unable to resolve native V4L2 async capture"
+        );
+      }
     }
 
-    napi_delete_async_work(env, data->work);
+    if (data->work) napi_delete_async_work(env, data->work);
     delete data;
   }
 
@@ -718,15 +817,44 @@ namespace {
     napi_value promise;
     napi_value resourceName;
 
-    data->options = ParseOptions(env, info);
+    if (napi_create_promise(env, &data->deferred, &promise) != napi_ok) {
+      delete data;
+      ThrowNodeError(
+        env,
+        "NODE_WEBCAM_NATIVE_CAPTURE_FAILED",
+        "Unable to create native V4L2 async capture promise"
+      );
 
-    napi_create_promise(env, &data->deferred, &promise);
-    napi_create_string_utf8(
-      env,
-      "node-webcam:captureMjpegAsync",
-      NAPI_AUTO_LENGTH,
-      &resourceName
-    );
+      return nullptr;
+    }
+
+    try {
+      data->options = ParseOptions(env, info);
+      AssertNapiOk(
+        napi_create_string_utf8(
+          env,
+          "node-webcam:captureMjpegAsync",
+          NAPI_AUTO_LENGTH,
+          &resourceName
+        ),
+        "Unable to create native V4L2 async capture resource name"
+      );
+    } catch (const NativeCaptureError& error) {
+      RejectDeferred(env, data->deferred, error.code(), error.what());
+      delete data;
+
+      return promise;
+    } catch (const std::exception& error) {
+      RejectDeferred(
+        env,
+        data->deferred,
+        "NODE_WEBCAM_NATIVE_CAPTURE_FAILED",
+        error.what()
+      );
+      delete data;
+
+      return promise;
+    }
 
     const napi_status createStatus = napi_create_async_work(
       env,
@@ -739,14 +867,11 @@ namespace {
     );
 
     if (createStatus != napi_ok) {
-      napi_reject_deferred(
+      RejectDeferred(
         env,
         data->deferred,
-        CreateNodeError(
-          env,
-          "NODE_WEBCAM_NATIVE_CAPTURE_FAILED",
-          "Unable to create native V4L2 async capture work"
-        )
+        "NODE_WEBCAM_NATIVE_CAPTURE_FAILED",
+        "Unable to create native V4L2 async capture work"
       );
       delete data;
 
@@ -757,14 +882,12 @@ namespace {
 
     if (queueStatus != napi_ok) {
       napi_delete_async_work(env, data->work);
-      napi_reject_deferred(
+      data->work = nullptr;
+      RejectDeferred(
         env,
         data->deferred,
-        CreateNodeError(
-          env,
-          "NODE_WEBCAM_NATIVE_CAPTURE_FAILED",
-          "Unable to queue native V4L2 async capture work"
-        )
+        "NODE_WEBCAM_NATIVE_CAPTURE_FAILED",
+        "Unable to queue native V4L2 async capture work"
       );
       delete data;
     }
@@ -817,7 +940,12 @@ namespace {
       }
     };
 
-    napi_define_properties(env, exports, 4, properties);
+    if (napi_define_properties(env, exports, 4, properties) != napi_ok)
+      napi_throw_error(
+        env,
+        "NODE_WEBCAM_NATIVE_CAPTURE_FAILED",
+        "Unable to define native V4L2 addon exports"
+      );
 
     return exports;
   }
