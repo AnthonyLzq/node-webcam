@@ -347,7 +347,9 @@ That command rebuilds the Linux x64 glibc native prebuild, writes
 checks that the manifest hashes match the native sources, `binding.gyp`, and the
 bundled `.node` prebuild so stale native artifacts fail before publication.
 Direct `npm pack` runs a `prepack` freshness check, but it does not rebuild the
-native prebuild; use it only for local inspection, not publication.
+native prebuild; use it only for local inspection, not publication. Never
+publish a tarball produced with `npm pack --ignore-scripts` because that skips
+the freshness checks entirely.
 
 ## Author
 

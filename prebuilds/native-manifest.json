@@ -3,10 +3,10 @@
   "algorithm": "sha256",
   "sources": {
     "binding.gyp": "50b781a17872df4f0edb5d6755e99368f11f2775f522011fca2b61577ddeb034",
-    "native/linux_v4l2.cc": "57cfaba4e53467ee54670170ba915e36ff160f80089df90d6bb647c7432230fc",
+    "native/linux_v4l2.cc": "55cc6e22797cef7153c7c2f28839db25385aeccab97849408b3b3be36a125b30",
     "native/unsupported.cc": "ddd4b0f4f73b3480e55423ead0b5a42a749077f2fea4bc95dc4f3fc71237640d"
   },
   "prebuilds": {
-    "prebuilds/linux-x64/@anthonylzq+node-webcam.glibc.node": "4373dcecc52b7931d45903eecce35ad880cd90f802f93dcfd1561c970988d8ba"
+    "prebuilds/linux-x64/@anthonylzq+node-webcam.glibc.node": "45904b1e9a72db5d25c7543f87ae77f03f2abc4a41fc43b2ce31a6a819477f8c"
   }
 }

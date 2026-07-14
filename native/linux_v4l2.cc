@@ -506,6 +506,36 @@ namespace {
     return mappedBuffers;
   }
 
+  void ReleaseMappedBuffers(int fd) {
+    v4l2_requestbuffers request = {};
+    request.count = 0;
+    request.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+    request.memory = V4L2_MEMORY_MMAP;
+
+    if (Xioctl(fd, VIDIOC_REQBUFS, &request) == -1)
+      throw NativeSystemError(
+        "NODE_WEBCAM_NATIVE_CAPTURE_FAILED",
+        "Unable to release V4L2 buffers"
+      );
+  }
+
+  void ProbeMappedBufferSupport(int fd) {
+    try {
+      {
+        MappedBuffers mappedBuffers = RequestMappedBuffers(fd);
+      }
+
+      ReleaseMappedBuffers(fd);
+    } catch (...) {
+      try {
+        ReleaseMappedBuffers(fd);
+      } catch (...) {
+      }
+
+      throw;
+    }
+  }
+
   // Step 4: hand the mapped buffers to the driver so it can fill them with frames.
   void QueueBuffers(int fd, MappedBuffers& mappedBuffers) {
     for (uint32_t index = 0; index < mappedBuffers.size(); index += 1) {
@@ -662,8 +692,9 @@ namespace {
   }
 
   // Availability is intentionally conservative: the addon is considered usable
-  // only if the target device exists, supports capture/streaming, and accepts
-  // MJPEG at the requested resolution.
+  // only if the target device exists, supports capture/streaming, accepts MJPEG
+  // at the requested resolution, and can allocate/mmap the buffers used later by
+  // the real capture path. It does not start streaming or dequeue frames.
   bool IsDeviceAvailable(const NativeOptions& options) {
     const int fd = open(options.device.c_str(), O_RDWR | O_NONBLOCK, 0);
 
@@ -674,6 +705,7 @@ namespace {
     try {
       AssertCaptureDevice(device.get(), options.device);
       ConfigureMjpegFormat(device.get(), options, false);
+      ProbeMappedBufferSupport(device.get());
 
       return true;
     } catch (...) {
