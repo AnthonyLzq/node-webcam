@@ -73,9 +73,16 @@ const canUseNativeLinuxBackend = (options: Partial<WebcamConfig>) => {
 const canUseFFmpegBackend = (options: Partial<WebcamConfig>) =>
   !hasLegacyOnlyOptions(options)
 
+const windowsCommandCamDeviceNumberPattern = /^[1-9]\d*$/
+
+const isWindowsCommandCamDeviceNumber = (options: Partial<WebcamConfig>) =>
+  typeof options.device === 'string' &&
+  windowsCommandCamDeviceNumberPattern.test(options.device.trim())
+
 const instantiateBackend = (
   backend: BackendSelection,
   config: WebcamConfig,
+  requestedOptions: Partial<WebcamConfig>,
   platform: Platform
 ): BaseWebcam => {
   switch (backend) {
@@ -87,8 +94,13 @@ const instantiateBackend = (
       return new FSWebcam(config)
     case 'imagesnap':
       return new ImageSnapWebcam(config)
-    case 'windows':
-      return new WindowsWebcam(config)
+    case 'windows': {
+      const windowsConfig = hasOwn(requestedOptions, 'output')
+        ? config
+        : { ...config, output: undefined }
+
+      return new WindowsWebcam(windowsConfig)
+    }
   }
 }
 
@@ -122,6 +134,7 @@ const selectBackend = (
     case 'win32':
       if (
         canUseFFmpegBackend(config) &&
+        !isWindowsCommandCamDeviceNumber(config) &&
         FFmpegWebcam.isAvailable(config, currentPlatform)
       )
         return 'ffmpeg'
@@ -159,7 +172,7 @@ const create = (options: Partial<WebcamConfig> = {}): BaseWebcam => {
 
   const backend = selectBackend(config, currentPlatform)
 
-  return instantiateBackend(backend, config, currentPlatform)
+  return instantiateBackend(backend, config, options, currentPlatform)
 }
 
 const clearBackendCaches = () => {

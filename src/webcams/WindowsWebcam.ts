@@ -25,6 +25,18 @@ class WindowsWebcam extends BaseWebcam {
   #bin: string
 
   constructor(options?: Partial<WebcamConfig>) {
+    if (options?.output && options.output !== 'bmp')
+      throw new WebcamError({
+        code: 'UNSUPPORTED_OUTPUT_FORMAT',
+        message:
+          'CommandCam only supports bmp output. Install ffmpeg for jpeg, jpg, or png capture on Windows.',
+        details: {
+          backend: 'CommandCam',
+          output: options.output,
+          supportedOutputs: ['bmp']
+        }
+      })
+
     super({ ...options, output: 'bmp' })
     this.#bin = resolveCommandCamPath()
 
@@ -88,8 +100,12 @@ class WindowsWebcam extends BaseWebcam {
   }
 
   async listWebcams(): Promise<string[]> {
+    const { options } = this
+
     return getPlatformCameras({
       platform: 'win32',
+      signal: options.signal,
+      timeout: options.timeout,
       windowsCommandCamPath: this.#bin
     })
   }

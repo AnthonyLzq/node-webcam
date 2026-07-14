@@ -44,7 +44,13 @@ class ImageSnapWebcam extends BaseWebcam {
   }
 
   async listWebcams(): Promise<string[]> {
-    return getPlatformCameras({ platform: 'darwin' })
+    const { options } = this
+
+    return getPlatformCameras({
+      platform: 'darwin',
+      signal: options.signal,
+      timeout: options.timeout
+    })
   }
 }
 

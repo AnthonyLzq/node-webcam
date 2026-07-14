@@ -340,6 +340,21 @@ describe('create', () => {
     assert.ok(webcam instanceof FFmpegWebcam)
   })
 
+  it('uses CommandCam for numeric Windows devices', () => {
+    mock.method(os, 'platform', () => 'win32')
+    mock.method(FFmpegWebcam, 'isAvailable', () => true)
+    const { cleanup, commandCamPath } = createCommandCamFixture()
+    process.env.NODE_WEBCAM_COMMANDCAM_PATH = commandCamPath
+
+    try {
+      const webcam = create({ device: '1' })
+
+      assert.ok(webcam instanceof WindowsWebcam)
+    } finally {
+      cleanup()
+    }
+  })
+
   it('keeps CommandCam on Windows when legacy-only options are requested', () => {
     mock.method(os, 'platform', () => 'win32')
     mock.method(FFmpegWebcam, 'isAvailable', () => true)
@@ -353,6 +368,24 @@ describe('create', () => {
       })
 
       assert.ok(webcam instanceof WindowsWebcam)
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('rejects non-bmp output when Windows falls back to CommandCam', () => {
+    mock.method(os, 'platform', () => 'win32')
+    mock.method(FFmpegWebcam, 'isAvailable', () => false)
+    const { cleanup, commandCamPath } = createCommandCamFixture()
+    process.env.NODE_WEBCAM_COMMANDCAM_PATH = commandCamPath
+
+    try {
+      assert.throws(() => create({ output: 'jpg' }), {
+        code: 'UNSUPPORTED_OUTPUT_FORMAT',
+        message:
+          'CommandCam only supports bmp output. Install ffmpeg for jpeg, jpg, or png capture on Windows.',
+        name: 'WebcamError'
+      })
     } finally {
       cleanup()
     }

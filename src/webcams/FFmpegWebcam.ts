@@ -115,7 +115,13 @@ class FFmpegWebcam extends BaseWebcam {
   }
 
   listWebcams(): Promise<string[]> {
-    return getPlatformCameras({ platform: this.#platform })
+    const { options } = this
+
+    return getPlatformCameras({
+      platform: this.#platform,
+      signal: options.signal,
+      timeout: options.timeout
+    })
   }
 
   protected getBackendName() {

@@ -80,6 +80,13 @@ CommandCam release tag and checksum are pinned in `package.json` and only need
 updates when that binary changes. Set `NODE_WEBCAM_COMMANDCAM_PATH` to use a
 manually installed executable instead.
 
+On Windows, `ffmpeg` uses DirectShow device names such as `"Integrated Webcam"`.
+CommandCam supports friendly names with `/devname` and 1-based numeric indexes
+with `/devnum`. Numeric strings such as `"1"` are treated as CommandCam indexes
+and skip ffmpeg selection. CommandCam only supports BMP output; requests for
+`jpeg`, `jpg`, or `png` require ffmpeg and fail clearly if the fallback would be
+CommandCam.
+
 ## Backend selection
 
 `capture()` and `create()` choose the first compatible available backend for

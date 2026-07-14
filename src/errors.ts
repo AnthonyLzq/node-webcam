@@ -21,6 +21,7 @@ export type WebcamErrorCode =
   | 'OUTPUT_READ_FAILED'
   | 'OUTPUT_WRITE_FAILED'
   | 'SHOT_NOT_FOUND'
+  | 'UNSUPPORTED_OUTPUT_FORMAT'
   | 'UNSUPPORTED_WEBCAM_TYPE'
 
 type WebcamErrorOptions = {

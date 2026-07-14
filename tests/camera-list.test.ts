@@ -5,6 +5,7 @@ import { delimiter, join } from 'node:path'
 import { describe, it, mock } from 'node:test'
 
 import { list, listWebcams } from '../src'
+import { FFmpegWebcam, ImageSnapWebcam, WindowsWebcam } from '../src/webcams'
 import {
   getCameras,
   getImageSnapListCommand,
@@ -304,6 +305,88 @@ describe('camera listing', () => {
       rmSync(directory, { force: true, recursive: true })
     }
   })
+
+  posixIt('passes ImageSnap instance timeout to camera listing', async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'node-webcam-imagesnap-'))
+    const imagesnap = join(directory, 'imagesnap')
+    const originalPath = process.env.PATH
+    const webcam = new ImageSnapWebcam({ timeout: 10 })
+
+    writeFileSync(
+      imagesnap,
+      ['#!/usr/bin/env node', waitForeverScript].join('\n')
+    )
+    chmodSync(imagesnap, 0o755)
+    process.env.PATH = `${directory}${delimiter}${originalPath}`
+
+    try {
+      await assert.rejects(() => webcam.listWebcams(), {
+        code: 'COMMAND_TIMEOUT',
+        name: 'WebcamError'
+      })
+    } finally {
+      process.env.PATH = originalPath
+      rmSync(directory, { force: true, recursive: true })
+    }
+  })
+
+  posixIt('passes FFmpeg instance timeout to camera listing', async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'node-webcam-imagesnap-'))
+    const imagesnap = join(directory, 'imagesnap')
+    const originalPath = process.env.PATH
+    const webcam = new FFmpegWebcam({ timeout: 10 }, 'darwin')
+
+    writeFileSync(
+      imagesnap,
+      ['#!/usr/bin/env node', waitForeverScript].join('\n')
+    )
+    chmodSync(imagesnap, 0o755)
+    process.env.PATH = `${directory}${delimiter}${originalPath}`
+
+    try {
+      await assert.rejects(() => webcam.listWebcams(), {
+        code: 'COMMAND_TIMEOUT',
+        name: 'WebcamError'
+      })
+    } finally {
+      process.env.PATH = originalPath
+      rmSync(directory, { force: true, recursive: true })
+    }
+  })
+
+  posixIt(
+    'passes WindowsWebcam instance signal to camera listing',
+    async () => {
+      const directory = mkdtempSync(join(tmpdir(), 'node-webcam-commandcam-'))
+      const commandCam = join(directory, 'CommandCam')
+      const originalCommandCamPath = process.env.NODE_WEBCAM_COMMANDCAM_PATH
+      const controller = new AbortController()
+      const timer = setTimeout(() => controller.abort(), 10)
+
+      writeFileSync(
+        commandCam,
+        ['#!/usr/bin/env node', waitForeverScript].join('\n')
+      )
+      chmodSync(commandCam, 0o755)
+      process.env.NODE_WEBCAM_COMMANDCAM_PATH = commandCam
+
+      try {
+        const webcam = new WindowsWebcam({ signal: controller.signal })
+
+        await assert.rejects(() => webcam.listWebcams(), {
+          code: 'COMMAND_ABORTED',
+          message: `Webcam command was aborted: ${commandCam}`,
+          name: 'WebcamError'
+        })
+      } finally {
+        clearTimeout(timer)
+        if (originalCommandCamPath === undefined)
+          delete process.env.NODE_WEBCAM_COMMANDCAM_PATH
+        else process.env.NODE_WEBCAM_COMMANDCAM_PATH = originalCommandCamPath
+        rmSync(directory, { force: true, recursive: true })
+      }
+    }
+  )
 
   it('exposes top-level list as a deprecated async listing API', async () => {
     mock.method(os, 'platform', () => 'freebsd')
