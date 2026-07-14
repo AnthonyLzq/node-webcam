@@ -98,7 +98,7 @@ const runQueued = async <T>(keys: string[], task: () => Promise<T>) => {
   return runNext(0)
 }
 
-const createTemporaryCapturePath = (path: string) => {
+const createDefaultTemporaryCapturePath = (path: string) => {
   const extension = extname(path)
   const pathWithoutExtension = extension
     ? path.slice(0, -extension.length)
@@ -284,6 +284,10 @@ class BaseWebcam {
     return this.#options.save !== true
   }
 
+  protected createTemporaryCapturePath(path: string) {
+    return createDefaultTemporaryCapturePath(path)
+  }
+
   private async persistCaptureOutput(path: string, buffer: Buffer) {
     const { save } = this.#options
 
@@ -359,7 +363,7 @@ class BaseWebcam {
 
     return runQueued(this.getCaptureQueueKeys(path), async () => {
       const executionPath = this.shouldUseTemporaryCapturePath()
-        ? createTemporaryCapturePath(path)
+        ? this.createTemporaryCapturePath(path)
         : path
 
       return this.runCapture(path, executionPath, Date.now() - queuedAt)

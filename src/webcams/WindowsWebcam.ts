@@ -1,4 +1,5 @@
-import { extname } from 'path'
+import { tmpdir } from 'os'
+import { extname, join } from 'path'
 
 import { WebcamError } from '../errors'
 import type { WebcamConfig } from '../types'
@@ -9,6 +10,7 @@ const COMMAND_CAM_MAX_ARGUMENT_BYTES = 99
 const COMMAND_CAM_SUPPORTED_OUTPUT = 'bmp'
 const commandCamDeviceNumberPattern = /^[1-9]\d*$/
 const commandCamUnsupportedOutputExtensions = new Set(['jpeg', 'jpg', 'png'])
+let commandCamTemporaryCaptureCounter = 0
 
 const createUnsupportedCommandCamOutputError = (output: string) =>
   new WebcamError({
@@ -36,6 +38,17 @@ const getCommandCamDeviceArgs = (device: WebcamConfig['device']) => {
 
 const quoteCommandCamShellArg = (arg: string) =>
   /\s/.test(arg) ? `"${arg}"` : arg
+
+const createCommandCamTemporaryCapturePath = (path: string) => {
+  commandCamTemporaryCaptureCounter += 1
+
+  return join(
+    tmpdir(),
+    `nw-${process.pid.toString(36)}-${Date.now().toString(
+      36
+    )}-${commandCamTemporaryCaptureCounter.toString(36)}${extname(path)}`
+  )
+}
 
 class WindowsWebcam extends BaseWebcam {
   #bin: string
@@ -108,6 +121,10 @@ class WindowsWebcam extends BaseWebcam {
           path
         }
       })
+  }
+
+  protected createTemporaryCapturePath(path: string) {
+    return createCommandCamTemporaryCapturePath(path)
   }
 
   async listWebcams(): Promise<string[]> {

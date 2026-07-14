@@ -7,10 +7,12 @@ import {
   rmSync,
   writeFileSync
 } from 'node:fs'
+import { writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { extname, join } from 'node:path'
 import { describe, it } from 'node:test'
 
+import { WebcamCommand } from '../src/webcams/BaseWebcam'
 import {
   FFmpegWebcam,
   FSWebcam,
@@ -20,6 +22,19 @@ import {
 
 const isWindows = process.platform === 'win32'
 const posixIt = isWindows ? it.skip : it
+
+class CapturingWindowsWebcam extends WindowsWebcam {
+  executionPaths: string[] = []
+
+  protected async executeCommand(command: WebcamCommand) {
+    const outputPath = command.args.at(-1)
+
+    if (!outputPath) throw new Error('Missing CommandCam output path')
+
+    this.executionPaths.push(outputPath)
+    await writeFile(outputPath, Buffer.from([1, 2, 3]))
+  }
+}
 
 const withCommandCamPath = (fn: (commandCamPath: string) => void) => {
   const directory = mkdtempSync(join(tmpdir(), 'node-webcam-commandcam-'))
@@ -223,6 +238,42 @@ describe('backend command generation', () => {
         name: 'WebcamError'
       })
     })
+  })
+
+  it('uses a short temporary CommandCam path for memory-only captures', async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'node-webcam-commandcam-'))
+    const commandCamPath = join(directory, 'CommandCam.exe')
+    const originalCommandCamPath = process.env.NODE_WEBCAM_COMMANDCAM_PATH
+    const targetOverheadBytes = Buffer.byteLength(
+      join(directory, '.bmp'),
+      'utf8'
+    )
+    const target = join(
+      directory,
+      `${'a'.repeat(Math.max(1, 87 - targetOverheadBytes))}.bmp`
+    )
+
+    writeFileSync(commandCamPath, '')
+    process.env.NODE_WEBCAM_COMMANDCAM_PATH = commandCamPath
+
+    try {
+      const webcam = new CapturingWindowsWebcam({ save: false })
+      const result = await webcam.capture({ location: target })
+      const [executionPath] = webcam.executionPaths
+
+      assert.ok(Buffer.byteLength(target, 'utf8') <= 99)
+      assert.notEqual(executionPath, target)
+      assert.equal(extname(executionPath), '.bmp')
+      assert.ok(Buffer.byteLength(executionPath, 'utf8') <= 99)
+      assert.equal(existsSync(target), false)
+      assert.deepEqual([...result.buffer], [1, 2, 3])
+    } finally {
+      if (originalCommandCamPath === undefined)
+        delete process.env.NODE_WEBCAM_COMMANDCAM_PATH
+      else process.env.NODE_WEBCAM_COMMANDCAM_PATH = originalCommandCamPath
+
+      rmSync(directory, { force: true, recursive: true })
+    }
   })
 
   it('builds the Linux ffmpeg command', () => {
