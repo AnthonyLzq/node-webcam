@@ -1,10 +1,26 @@
+import { extname } from 'path'
+
 import { WebcamError } from '../errors'
 import type { WebcamConfig } from '../types'
 import { getPlatformCameras, resolveCommandCamPath } from '../utils'
 import { BaseWebcam, WebcamCommand } from './BaseWebcam'
 
 const COMMAND_CAM_MAX_ARGUMENT_BYTES = 99
+const COMMAND_CAM_SUPPORTED_OUTPUT = 'bmp'
 const commandCamDeviceNumberPattern = /^[1-9]\d*$/
+const commandCamUnsupportedOutputExtensions = new Set(['jpeg', 'jpg', 'png'])
+
+const createUnsupportedCommandCamOutputError = (output: string) =>
+  new WebcamError({
+    code: 'UNSUPPORTED_OUTPUT_FORMAT',
+    message:
+      'CommandCam only supports bmp output. Install ffmpeg for jpeg, jpg, or png capture on Windows.',
+    details: {
+      backend: 'CommandCam',
+      output,
+      supportedOutputs: [COMMAND_CAM_SUPPORTED_OUTPUT]
+    }
+  })
 
 const getCommandCamDeviceArgs = (device: WebcamConfig['device']) => {
   if (typeof device !== 'string') return []
@@ -25,19 +41,10 @@ class WindowsWebcam extends BaseWebcam {
   #bin: string
 
   constructor(options?: Partial<WebcamConfig>) {
-    if (options?.output && options.output !== 'bmp')
-      throw new WebcamError({
-        code: 'UNSUPPORTED_OUTPUT_FORMAT',
-        message:
-          'CommandCam only supports bmp output. Install ffmpeg for jpeg, jpg, or png capture on Windows.',
-        details: {
-          backend: 'CommandCam',
-          output: options.output,
-          supportedOutputs: ['bmp']
-        }
-      })
+    if (options?.output && options.output !== COMMAND_CAM_SUPPORTED_OUTPUT)
+      throw createUnsupportedCommandCamOutputError(options.output)
 
-    super({ ...options, output: 'bmp' })
+    super({ ...options, output: COMMAND_CAM_SUPPORTED_OUTPUT })
     this.#bin = resolveCommandCamPath()
 
     if (options?.delay) super.setDelayInMilliseconds()
@@ -77,7 +84,11 @@ class WindowsWebcam extends BaseWebcam {
   protected validateOutputPath(path: string) {
     super.validateOutputPath(path)
 
+    const extension = extname(path).slice(1).toLowerCase()
     const bytes = Buffer.byteLength(path, 'utf8')
+
+    if (commandCamUnsupportedOutputExtensions.has(extension))
+      throw createUnsupportedCommandCamOutputError(extension)
 
     if (path.includes('"'))
       throw new WebcamError({

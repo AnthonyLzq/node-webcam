@@ -226,6 +226,10 @@ API.
   }
   ```
 
+  On Windows without an eligible ffmpeg device, the CommandCam fallback only
+  supports BMP output. Use a `.bmp` location there, or install/configure ffmpeg
+  for `jpeg`, `jpg`, or `png` captures.
+
 - In case you want to use another file type such as `jpg`, `png` or `bmp` you **must** indicate it in the `options` object, otherwise you will get an error:
 
   ```ts

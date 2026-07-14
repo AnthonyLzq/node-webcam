@@ -208,6 +208,23 @@ describe('backend command generation', () => {
     })
   })
 
+  it('rejects non-bmp CommandCam output paths with a backend-specific error', () => {
+    withCommandCamPath(() => {
+      const webcam = new WindowsWebcam({})
+
+      assert.throws(() => webcam.generateCommand('photo.jpg'), {
+        code: 'UNSUPPORTED_OUTPUT_FORMAT',
+        message:
+          'CommandCam only supports bmp output. Install ffmpeg for jpeg, jpg, or png capture on Windows.',
+        name: 'WebcamError'
+      })
+      assert.throws(() => webcam.generateSh('photo.png'), {
+        code: 'UNSUPPORTED_OUTPUT_FORMAT',
+        name: 'WebcamError'
+      })
+    })
+  })
+
   it('builds the Linux ffmpeg command', () => {
     const webcam = new FFmpegWebcam(
       {

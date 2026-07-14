@@ -339,6 +339,24 @@ describe('create', () => {
     }
   })
 
+  it('rejects explicit non-bmp capture locations on CommandCam fallback', async () => {
+    mock.method(os, 'platform', () => 'win32')
+    mock.method(FFmpegWebcam, 'isAvailable', () => false)
+    const { cleanup, commandCamPath } = createCommandCamFixture()
+    process.env.NODE_WEBCAM_COMMANDCAM_PATH = commandCamPath
+
+    try {
+      await assert.rejects(() => capture({ location: 'picture.jpeg' }), {
+        code: 'UNSUPPORTED_OUTPUT_FORMAT',
+        message:
+          'CommandCam only supports bmp output. Install ffmpeg for jpeg, jpg, or png capture on Windows.',
+        name: 'WebcamError'
+      })
+    } finally {
+      cleanup()
+    }
+  })
+
   it('uses ffmpeg on Windows before falling back to CommandCam', () => {
     mock.method(os, 'platform', () => 'win32')
     mock.method(FFmpegWebcam, 'isAvailable', () => true)
