@@ -1,12 +1,44 @@
 #include <node_api.h>
 
 namespace {
+  constexpr const char* ERROR_CODE = "NODE_WEBCAM_NATIVE_UNSUPPORTED";
+  constexpr const char* ERROR_MESSAGE =
+    "Native webcam capture is only implemented on Linux in this spike";
+
+  napi_value CreateNodeError(napi_env env) {
+    napi_value message;
+    napi_value error;
+    napi_value code;
+
+    if (
+      napi_create_string_utf8(env, ERROR_MESSAGE, NAPI_AUTO_LENGTH, &message) !=
+        napi_ok ||
+      napi_create_error(env, nullptr, message, &error) != napi_ok ||
+      napi_create_string_utf8(env, ERROR_CODE, NAPI_AUTO_LENGTH, &code) !=
+        napi_ok ||
+      napi_set_named_property(env, error, "code", code) != napi_ok
+    )
+      return nullptr;
+
+    return error;
+  }
+
+  void ThrowUnsupported(napi_env env) {
+    if (napi_throw_error(env, ERROR_CODE, ERROR_MESSAGE) != napi_ok)
+      napi_fatal_error(
+        "node-webcam",
+        NAPI_AUTO_LENGTH,
+        "Unable to throw unsupported native webcam error",
+        NAPI_AUTO_LENGTH
+      );
+  }
+
   // This file is compiled for non-Linux platforms during the spike. It keeps the
   // native module loadable, but explicitly reports that capture is unavailable.
   napi_value IsAvailable(napi_env env, napi_callback_info) {
     napi_value result;
 
-    napi_get_boolean(env, false, &result);
+    if (napi_get_boolean(env, false, &result) != napi_ok) return nullptr;
 
     return result;
   }
@@ -14,7 +46,7 @@ namespace {
   napi_value IsCaptureDevice(napi_env env, napi_callback_info) {
     napi_value result;
 
-    napi_get_boolean(env, false, &result);
+    if (napi_get_boolean(env, false, &result) != napi_ok) return nullptr;
 
     return result;
   }
@@ -22,11 +54,7 @@ namespace {
   // Keep the same JS-facing API as the Linux addon so callers can probe
   // availability before attempting capture.
   napi_value CaptureMjpeg(napi_env env, napi_callback_info) {
-    napi_throw_error(
-      env,
-      nullptr,
-      "Native webcam capture is only implemented on Linux in this spike"
-    );
+    ThrowUnsupported(env);
 
     return nullptr;
   }
@@ -34,18 +62,20 @@ namespace {
   napi_value CaptureMjpegAsync(napi_env env, napi_callback_info) {
     napi_deferred deferred;
     napi_value promise;
-    napi_value message;
-    napi_value error;
 
-    napi_create_promise(env, &deferred, &promise);
-    napi_create_string_utf8(
-      env,
-      "Native webcam capture is only implemented on Linux in this spike",
-      NAPI_AUTO_LENGTH,
-      &message
-    );
-    napi_create_error(env, nullptr, message, &error);
-    napi_reject_deferred(env, deferred, error);
+    if (napi_create_promise(env, &deferred, &promise) != napi_ok) {
+      ThrowUnsupported(env);
+
+      return nullptr;
+    }
+
+    napi_value error = CreateNodeError(env);
+
+    if (
+      error == nullptr ||
+      napi_reject_deferred(env, deferred, error) != napi_ok
+    )
+      ThrowUnsupported(env);
 
     return promise;
   }
@@ -99,7 +129,8 @@ namespace {
       }
     };
 
-    napi_define_properties(env, exports, 4, properties);
+    if (napi_define_properties(env, exports, 4, properties) != napi_ok)
+      ThrowUnsupported(env);
 
     return exports;
   }
