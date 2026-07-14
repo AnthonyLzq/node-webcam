@@ -6,6 +6,7 @@ import { afterEach, describe, it, mock } from 'node:test'
 
 import {
   capture,
+  clearBackendCaches,
   clearBackendSelectionCache,
   create,
   FSWebcam,
@@ -64,7 +65,7 @@ const createCommandCamFixture = () => {
 
 describe('create', () => {
   afterEach(() => {
-    clearBackendSelectionCache()
+    clearBackendCaches()
     mock.restoreAll()
     delete process.env.NODE_WEBCAM_COMMANDCAM_PATH
   })
@@ -114,7 +115,7 @@ describe('create', () => {
     assert.ok(webcam instanceof FFmpegWebcam)
   })
 
-  it('caches backend selection without reusing backend instances', async () => {
+  it('re-evaluates backend selection without reusing backend instances', async () => {
     mock.method(os, 'platform', () => 'linux')
     mock.method(NativeLinuxWebcam, 'isAvailable', () => false)
     const ffmpegAvailability = mock.method(
@@ -147,11 +148,15 @@ describe('create', () => {
     await capture({ location: 'first.jpeg' })
     await capture({ location: 'second.jpeg' })
 
-    assert.equal(ffmpegAvailability.mock.callCount(), 1)
+    assert.equal(ffmpegAvailability.mock.callCount(), 2)
     assert.deepEqual(calls, [
       ['first.jpeg', 'true'],
       ['second.jpeg', 'true']
     ])
+  })
+
+  it('keeps the deprecated backend selection cache reset as an alias', () => {
+    assert.equal(clearBackendSelectionCache, clearBackendCaches)
   })
 
   it('reports the native Linux backend as available when its addon is available', () => {

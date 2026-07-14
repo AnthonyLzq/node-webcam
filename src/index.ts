@@ -29,7 +29,6 @@ type BackendSelection =
   | 'imagesnap'
   | 'native-linux'
   | 'windows'
-const backendSelectionCache = new Map<string, BackendSelection>()
 const legacyOnlyOptions: Array<[keyof WebcamConfig, unknown]> = [
   ['bottomBanner', false],
   ['delay', 0],
@@ -73,29 +72,6 @@ const canUseNativeLinuxBackend = (options: Partial<WebcamConfig>) => {
 
 const canUseFFmpegBackend = (options: Partial<WebcamConfig>) =>
   !hasLegacyOnlyOptions(options)
-
-const getBackendSelectionCacheKey = (platform: string, config: WebcamConfig) =>
-  JSON.stringify({
-    bottomBanner: config.bottomBanner,
-    delay: config.delay,
-    device: config.device,
-    ffmpegPath: config.ffmpegPath,
-    frames: config.frames,
-    greyScale: config.greyScale,
-    height: config.height,
-    output: config.output,
-    platform,
-    quality: config.quality,
-    rotation: config.rotation,
-    signal: Boolean(config.signal),
-    skip: config.skip,
-    subtitle: config.subtitle,
-    timeout: config.timeout,
-    timestamp: config.timestamp,
-    title: config.title,
-    topBanner: config.topBanner,
-    width: config.width
-  })
 
 const instantiateBackend = (
   backend: BackendSelection,
@@ -181,20 +157,16 @@ const create = (options: Partial<WebcamConfig> = {}): BaseWebcam => {
       }
     })
 
-  const cacheKey = getBackendSelectionCacheKey(currentPlatform, config)
-  const cachedSelection = backendSelectionCache.get(cacheKey)
-
-  if (cachedSelection)
-    return instantiateBackend(cachedSelection, config, currentPlatform)
-
   const backend = selectBackend(config, currentPlatform)
-
-  backendSelectionCache.set(cacheKey, backend)
 
   return instantiateBackend(backend, config, currentPlatform)
 }
 
-const clearBackendSelectionCache = () => backendSelectionCache.clear()
+const clearBackendCaches = () => {
+  FFmpegWebcam.clearAvailabilityCache()
+}
+
+const clearBackendSelectionCache = clearBackendCaches
 
 const capture = async ({ location, options = {}, cb }: CaptureRequest = {}) => {
   const Webcam = create(options)
@@ -213,6 +185,7 @@ const listWebcams = async (options: ListRequest = {}) =>
 
 export {
   create,
+  clearBackendCaches,
   clearBackendSelectionCache,
   capture,
   list,

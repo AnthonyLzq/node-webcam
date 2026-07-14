@@ -165,11 +165,11 @@ try {
       '-e',
       [
         "const webcam = require('@anthonylzq/node-webcam')",
-        "for (const key of ['capture', 'create', 'list', 'listWebcams', 'getMetricsReport', 'resetMetrics']) {",
+        "for (const key of ['capture', 'clearBackendCaches', 'create', 'list', 'listWebcams', 'getMetricsReport', 'resetMetrics']) {",
         "  if (typeof webcam[key] !== 'function') throw new Error(`Missing export: ${key}`)",
         '}',
         "const instance = webcam.create({ output: 'jpeg', saveShots: false })",
-        "if (!['native', 'legacy'].includes(instance.getBackendType())) throw new Error('Unexpected backend type')"
+        "if (!['ffmpeg', 'native', 'legacy'].includes(instance.getBackendType())) throw new Error('Unexpected backend type')"
       ].join('\n')
     ],
     {
@@ -182,11 +182,11 @@ try {
     join(consumerDirectory, 'index.mjs'),
     [
       "import * as webcam from '@anthonylzq/node-webcam'",
-      "for (const key of ['capture', 'create', 'list', 'listWebcams', 'getMetricsReport', 'resetMetrics']) {",
+      "for (const key of ['capture', 'clearBackendCaches', 'create', 'list', 'listWebcams', 'getMetricsReport', 'resetMetrics']) {",
       "  if (typeof webcam[key] !== 'function') throw new Error(`Missing ESM export: ${key}`)",
       '}',
       "const instance = webcam.create({ output: 'jpeg', saveShots: false })",
-      "if (!['native', 'legacy'].includes(instance.getBackendType())) throw new Error('Unexpected ESM backend type')"
+      "if (!['ffmpeg', 'native', 'legacy'].includes(instance.getBackendType())) throw new Error('Unexpected ESM backend type')"
     ].join('\n')
   )
 
@@ -198,8 +198,9 @@ try {
   writeFileSync(
     join(consumerDirectory, 'index.ts'),
     [
-      "import { capture, create, getMetricsReport, listWebcams, type NodeWebcamConfig, type WebcamMetricsReport } from '@anthonylzq/node-webcam'",
+      "import { capture, clearBackendCaches, create, getMetricsReport, listWebcams, type NodeWebcamConfig, type WebcamMetricsReport } from '@anthonylzq/node-webcam'",
       "const options: Partial<NodeWebcamConfig> = { device: false, output: 'jpg', save: false, timeout: 1 }",
+      'clearBackendCaches()',
       'const webcam = create(options)',
       'void webcam.listWebcams()',
       'void listWebcams()',
@@ -213,8 +214,9 @@ try {
   writeFileSync(
     join(consumerDirectory, 'index.mts'),
     [
-      "import { capture, create, getMetricsReport, listWebcams, type NodeWebcamConfig, type WebcamMetricsReport } from '@anthonylzq/node-webcam'",
+      "import { capture, clearBackendCaches, create, getMetricsReport, listWebcams, type NodeWebcamConfig, type WebcamMetricsReport } from '@anthonylzq/node-webcam'",
       "const options: Partial<NodeWebcamConfig> = { device: false, output: 'jpg', save: async (_path, _buffer) => false, timeout: 1 }",
+      'clearBackendCaches()',
       'const webcam = create(options)',
       'void webcam.listWebcams()',
       'void listWebcams()',
