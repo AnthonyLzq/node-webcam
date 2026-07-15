@@ -834,6 +834,27 @@ describe('BaseWebcam', () => {
     }
   })
 
+  it('does not require the logical output directory for memory-only file captures', async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'node-webcam-'))
+    const path = join(directory, 'missing', 'photo.jpeg')
+    const webcam = new Base64CountingWebcam({
+      output: 'jpeg',
+      save: false,
+      saveShots: false
+    })
+
+    try {
+      const result = await webcam.capture({ location: path })
+
+      assert.equal(result.location, path)
+      assert.deepEqual([...result.buffer], [1, 2, 3])
+      assert.equal(existsSync(path), false)
+      assert.equal(existsSync(join(directory, 'missing')), false)
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
+  })
+
   it('supports custom capture persistence callbacks', async () => {
     const directory = mkdtempSync(join(tmpdir(), 'node-webcam-'))
     const path = join(directory, 'native-photo.png')

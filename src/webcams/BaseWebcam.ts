@@ -1,6 +1,7 @@
 import { execFile } from 'child_process'
 import { readFile, rm, writeFile } from 'fs/promises'
-import { basename, extname, resolve } from 'path'
+import { tmpdir } from 'os'
+import { basename, extname, join, resolve } from 'path'
 import { promisify } from 'util'
 
 import {
@@ -100,15 +101,15 @@ const runQueued = async <T>(keys: string[], task: () => Promise<T>) => {
 
 const createDefaultTemporaryCapturePath = (path: string) => {
   const extension = extname(path)
-  const pathWithoutExtension = extension
-    ? path.slice(0, -extension.length)
-    : path
 
   temporaryCaptureCounter += 1
 
-  return `${pathWithoutExtension}.node-webcam-${
-    process.pid
-  }-${Date.now()}-${temporaryCaptureCounter}${extension}`
+  return join(
+    tmpdir(),
+    `node-webcam-${
+      process.pid
+    }-${Date.now()}-${temporaryCaptureCounter}${extension}`
+  )
 }
 
 class BaseWebcam {
