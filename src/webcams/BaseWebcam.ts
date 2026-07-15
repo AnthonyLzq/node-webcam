@@ -202,6 +202,10 @@ class BaseWebcam {
       })
   }
 
+  protected validateCapturePath(path: string) {
+    this.validateOutputPath(path)
+  }
+
   protected createDiagnosticId(operation: string) {
     diagnosticCounter += 1
 
@@ -321,7 +325,7 @@ class BaseWebcam {
         details: { path }
       })
 
-    this.validateOutputPath(path)
+    this.validateCapturePath(path)
 
     if (!match[0])
       throw new WebcamError({

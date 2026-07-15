@@ -50,6 +50,13 @@ const createCommandCamTemporaryCapturePath = (path: string) => {
   )
 }
 
+const validateCommandCamOutputExtension = (path: string) => {
+  const extension = extname(path).slice(1).toLowerCase()
+
+  if (commandCamUnsupportedOutputExtensions.has(extension))
+    throw createUnsupportedCommandCamOutputError(extension)
+}
+
 class WindowsWebcam extends BaseWebcam {
   #bin: string
 
@@ -96,12 +103,9 @@ class WindowsWebcam extends BaseWebcam {
 
   protected validateOutputPath(path: string) {
     super.validateOutputPath(path)
+    validateCommandCamOutputExtension(path)
 
-    const extension = extname(path).slice(1).toLowerCase()
     const bytes = Buffer.byteLength(path, 'utf8')
-
-    if (commandCamUnsupportedOutputExtensions.has(extension))
-      throw createUnsupportedCommandCamOutputError(extension)
 
     if (path.includes('"'))
       throw new WebcamError({
@@ -121,6 +125,11 @@ class WindowsWebcam extends BaseWebcam {
           path
         }
       })
+  }
+
+  protected validateCapturePath(path: string) {
+    super.validateOutputPath(path)
+    validateCommandCamOutputExtension(path)
   }
 
   protected createTemporaryCapturePath(path: string) {
