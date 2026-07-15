@@ -1,4 +1,5 @@
 import { execFile } from 'child_process'
+import { mkdtempSync } from 'fs'
 import { readFile, rm, writeFile } from 'fs/promises'
 import { tmpdir } from 'os'
 import { basename, extname, join, resolve } from 'path'
@@ -45,6 +46,11 @@ export type WebcamCaptureExecution = {
 
 export type WebcamCaptureOptions = {
   location: string
+}
+
+type TemporaryCaptureTarget = {
+  cleanupPath: string
+  path: string
 }
 
 export type WebcamCaptureResult = {
@@ -99,17 +105,16 @@ const runQueued = async <T>(keys: string[], task: () => Promise<T>) => {
   return runNext(0)
 }
 
-const createDefaultTemporaryCapturePath = (path: string) => {
+const createDefaultTemporaryCaptureTarget = (path: string) => {
   const extension = extname(path)
+  const directory = mkdtempSync(join(tmpdir(), 'node-webcam-'))
 
   temporaryCaptureCounter += 1
 
-  return join(
-    tmpdir(),
-    `node-webcam-${
-      process.pid
-    }-${Date.now()}-${temporaryCaptureCounter}${extension}`
-  )
+  return {
+    cleanupPath: directory,
+    path: join(directory, `capture-${temporaryCaptureCounter}${extension}`)
+  }
 }
 
 class BaseWebcam {
@@ -293,8 +298,8 @@ class BaseWebcam {
     return this.#options.save !== true
   }
 
-  protected createTemporaryCapturePath(path: string) {
-    return createDefaultTemporaryCapturePath(path)
+  protected createTemporaryCaptureTarget(path: string): TemporaryCaptureTarget {
+    return createDefaultTemporaryCaptureTarget(path)
   }
 
   private async persistCaptureOutput(path: string, buffer: Buffer) {
@@ -371,18 +376,25 @@ class BaseWebcam {
     const queuedAt = Date.now()
 
     return runQueued(this.getCaptureQueueKeys(path), async () => {
-      const executionPath = this.shouldUseTemporaryCapturePath()
-        ? this.createTemporaryCapturePath(path)
-        : path
+      const temporaryCaptureTarget = this.shouldUseTemporaryCapturePath()
+        ? this.createTemporaryCaptureTarget(path)
+        : undefined
+      const executionPath = temporaryCaptureTarget?.path ?? path
 
-      return this.runCapture(path, executionPath, Date.now() - queuedAt)
+      return this.runCapture(
+        path,
+        executionPath,
+        Date.now() - queuedAt,
+        temporaryCaptureTarget
+      )
     })
   }
 
   private async runCapture(
     path: string,
     executionPath: string,
-    queueWaitMs: number
+    queueWaitMs: number,
+    temporaryCaptureTarget?: TemporaryCaptureTarget
   ) {
     const operationId = this.createDiagnosticId('capture')
     const startedAt = Date.now()
@@ -391,6 +403,15 @@ class BaseWebcam {
     const backendType = this.getBackendType()
     const temporaryCapturePath =
       executionPath !== path ? executionPath : undefined
+    const cleanupTemporaryCapture = async () => {
+      if (temporaryCaptureTarget)
+        await rm(temporaryCaptureTarget.cleanupPath, {
+          force: true,
+          recursive: true
+        })
+      else if (temporaryCapturePath)
+        await rm(temporaryCapturePath, { force: true })
+    }
     const diagnosticDetails = execution.details ?? {}
     const diagnosticBase: Record<string, unknown> = {
       ...diagnosticDetails,
@@ -463,7 +484,7 @@ class BaseWebcam {
         'error'
       )
 
-      if (temporaryCapturePath) await rm(temporaryCapturePath, { force: true })
+      await cleanupTemporaryCapture()
 
       throw typedError
     }
@@ -510,7 +531,7 @@ class BaseWebcam {
         'error'
       )
 
-      if (temporaryCapturePath) await rm(temporaryCapturePath, { force: true })
+      await cleanupTemporaryCapture()
 
       throw typedError
     }
@@ -559,7 +580,7 @@ class BaseWebcam {
 
       throw typedError
     } finally {
-      if (temporaryCapturePath) await rm(temporaryCapturePath, { force: true })
+      await cleanupTemporaryCapture()
     }
 
     if (this.#options.saveShots) this.#shots.push(this.createShot(path, buffer))

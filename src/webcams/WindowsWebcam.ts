@@ -1,3 +1,4 @@
+import { mkdtempSync } from 'fs'
 import { tmpdir } from 'os'
 import { extname, join } from 'path'
 
@@ -41,13 +42,15 @@ const quoteCommandCamShellArg = (arg: string) =>
 
 const createCommandCamTemporaryCapturePath = (path: string) => {
   commandCamTemporaryCaptureCounter += 1
+  const directory = mkdtempSync(join(tmpdir(), 'nw-'))
 
-  return join(
-    tmpdir(),
-    `nw-${process.pid.toString(36)}-${Date.now().toString(
-      36
-    )}-${commandCamTemporaryCaptureCounter.toString(36)}${extname(path)}`
-  )
+  return {
+    cleanupPath: directory,
+    path: join(
+      directory,
+      `c-${commandCamTemporaryCaptureCounter.toString(36)}${extname(path)}`
+    )
+  }
 }
 
 const validateCommandCamOutputExtension = (path: string) => {
@@ -136,7 +139,7 @@ class WindowsWebcam extends BaseWebcam {
     return true
   }
 
-  protected createTemporaryCapturePath(path: string) {
+  protected createTemporaryCaptureTarget(path: string) {
     return createCommandCamTemporaryCapturePath(path)
   }
 
