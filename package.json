@@ -1,17 +1,40 @@
 {
   "name": "@anthonylzq/node-webcam",
-  "version": "2.2.0",
+  "version": "3.0.0",
   "description": "Cross platform webcam capture",
-  "main": "dist/index.js",
+  "main": "dist/cjs/index.js",
+  "module": "dist/esm/index.js",
+  "engines": {
+    "node": ">=20.9.0"
+  },
   "scripts": {
-    "postinstall": "node ./bin/postinstall.js",
-    "demo": "npm run prepare && ts-node examples/websocket/App.ts",
-    "lint": "eslint --fix src --ext .ts",
-    "lint:dist": "eslint --fix dist --ext .ts",
-    "prepare": "npm run rm:dist && tsc && tsc-alias && cp -r src/bindings dist && npm run lint:dist",
+    "build": "npm run rm:dist && npm run build:cjs && npm run build:esm && npm run build:types && node scripts/prepare-esm.js",
+    "build:cjs": "tsc -p tsconfig.cjs.json",
+    "build:esm": "tsc -p tsconfig.esm.json",
+    "build:types": "tsc -p tsconfig.types.json",
+    "benchmark:capture": "npm run native:build && ts-node benchmarks/capture-backends.ts",
+    "check": "npm run typecheck && npm run lint:check && npm test",
+    "setup:windows": "node ./bin/node-webcam.js setup windows",
+    "demo": "npm run build && ts-node examples/websocket/App.ts",
+    "install": "node -e \"\"",
+    "lint": "npm run lint:check",
+    "lint:check": "eslint benchmarks src tests --ext .ts",
+    "lint:fix": "eslint --fix benchmarks src tests --ext .ts",
+    "native:build": "node-gyp rebuild",
+    "native:manifest": "node scripts/write-native-manifest.js",
+    "native:manifest:check": "node scripts/check-native-manifest.js",
+    "native:prebuild": "prebuildify --napi --strip --tag-libc && npm run native:manifest",
+    "native:smoke": "npm run native:build && node scripts/smoke-native-v4l2.js",
+    "pack:check": "npm run check && npm run build && node scripts/validate-pack.js",
+    "prepare": "npm run build",
+    "prepack": "npm run check && npm run native:manifest:check",
+    "prepublishOnly": "npm run publish:check",
+    "publish:check": "node scripts/publish-check.js",
+    "typecheck": "tsc --noEmit",
+    "test": "node scripts/run-tests.js",
     "release": "standard-version",
     "version": "npm run release && git add .",
-    "rm:dist": "if [ -d \"dist\" ]; then rm -rf dist; fi"
+    "rm:dist": "node scripts/clean-dist.js"
   },
   "repository": {
     "type": "git",
@@ -36,14 +59,40 @@
       "email": "sluzquinosa@uni.pe"
     }
   ],
-  "types": "dist/index.d.ts",
+  "types": "dist/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/types/index.d.ts",
+      "import": "./dist/esm/index.js",
+      "require": "./dist/cjs/index.js",
+      "default": "./dist/esm/index.js"
+    }
+  },
+  "bin": {
+    "node-webcam": "bin/node-webcam.js"
+  },
+  "nodeWebcam": {
+    "commandCam": {
+      "releaseTag": "v2.1.0",
+      "sha256": "012d3ff83b1e65182807512fc9d04bcfdb40736fcdc2f7aba57531cbf031769e",
+      "minBytes": 1024
+    }
+  },
+  "files": [
+    "bin/node-webcam.js",
+    "bin/setup.js",
+    "dist",
+    "LICENSE",
+    "prebuilds",
+    "README.md",
+    "static/node-webcam.png"
+  ],
   "license": "MIT",
   "bugs": {
     "url": "https://github.com/AnthonyLzq/node-webcam/issues"
   },
   "homepage": "https://github.com/AnthonyLzq/node-webcam#readme",
   "devDependencies": {
-    "@types/node": "^18.11.18",
     "@types/ws": "^8.5.3",
     "@typescript-eslint/eslint-plugin": "^5.47.1",
     "@typescript-eslint/parser": "^5.47.1",
@@ -57,10 +106,10 @@
     "eslint-plugin-node": "^11.1.0",
     "eslint-plugin-prettier": "^4.2.1",
     "eslint-plugin-promise": "^6.1.1",
+    "prebuildify": "^6.0.1",
+    "prettier": "^2.8.8",
     "standard-version": "^9.5.0",
     "ts-node": "^10.9.1",
-    "tsc-alias": "^1.8.2",
-    "tsconfig-paths": "^4.1.1",
     "typescript": "^4.9.4",
     "ws": "^8.11.0"
   },
@@ -70,5 +119,9 @@
       "commit": true,
       "bump": true
     }
+  },
+  "dependencies": {
+    "@types/node": "^20.19.43",
+    "node-gyp-build": "^4.8.4"
   }
 }

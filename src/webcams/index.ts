@@ -1,4 +1,6 @@
 export * from './BaseWebcam'
+export * from './FFmpegWebcam'
 export * from './FSWebcam'
 export * from './ImageSnapWebcam'
+export * from './NativeLinuxWebcam'
 export * from './WindowsWebcam'

@@ -1,10 +1,6 @@
-import { exec } from 'child_process'
-import { promisify } from 'util'
-
-import type { WebcamConfig } from 'types'
-import { BaseWebcam } from './BaseWebcam'
-
-const asyncExec = promisify(exec)
+import type { WebcamConfig } from '../types'
+import { getPlatformCameras } from '../utils'
+import { BaseWebcam, WebcamCommand } from './BaseWebcam'
 
 class ImageSnapWebcam extends BaseWebcam {
   #bin: string
@@ -16,7 +12,12 @@ class ImageSnapWebcam extends BaseWebcam {
     if (options?.delay && options?.delay < 1) super.setMaxDelay()
   }
 
+  /**
+   * @deprecated Use `generateCommand()` for safe argument-based execution.
+   */
   generateSh(location: string): string {
+    this.validateOutputPath(location)
+
     const { options } = this
     const verbose = options.verbose ? '-v' : '-q'
     const delay = options.delay ? `-w ${options.delay}` : ''
@@ -28,26 +29,28 @@ class ImageSnapWebcam extends BaseWebcam {
     )
   }
 
+  generateCommand(location: string): WebcamCommand {
+    this.validateOutputPath(location)
+
+    const { options } = this
+    const args = []
+
+    if (options.delay) args.push('-w', String(options.delay))
+    if (options.device) args.push('-d', options.device)
+
+    args.push(options.verbose ? '-v' : '-q', location)
+
+    return { file: this.#bin, args }
+  }
+
   async listWebcams(): Promise<string[]> {
-    const sh = `${this.#bin} -l`
-    const result = await asyncExec(sh)
+    const { options } = this
 
-    if (result.stderr) {
-      if (this.options.verbose)
-        console.error('Error while listing webcams: ', result.stderr)
-
-      throw new Error(result.stderr)
-    }
-
-    const lines = result.stdout.split('\n')
-
-    return lines.reduce<string[]>((acc, line) => {
-      if (line === 'Video Devices:' || !line) return acc
-
-      acc.push(line.replace(/.*?\[(.*?)\].*/, '$1'))
-
-      return acc
-    }, [])
+    return getPlatformCameras({
+      platform: 'darwin',
+      signal: options.signal,
+      timeout: options.timeout
+    })
   }
 }
 

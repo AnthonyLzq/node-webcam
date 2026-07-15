@@ -7,95 +7,295 @@ Cross platform webcam usage
 
 ## Install
 
+### Requirements
+
+- Node.js `>=20.9.0`.
+
+| Platform | Built-in/native path | Optional fallback requirements | Notes |
+| --- | --- | --- | --- |
+| Linux | Bundled native V4L2 prebuild for `linux-x64` | `ffmpeg`, then `fswebcam` | Other Linux architectures/libc variants fall back when no matching native prebuild exists. |
+| macOS | None yet | `ffmpeg`, then `imagesnap` | Camera permissions are controlled by macOS and may require granting access to the terminal/app running Node.js. |
+| Windows | None yet | `ffmpeg` with an explicit DirectShow `device`, then `CommandCam.exe` via setup | Run `npx @anthonylzq/node-webcam setup windows` for CommandCam fallback, or set `NODE_WEBCAM_COMMANDCAM_PATH`. |
+
+### Versioning and migration from 2.x
+
+Version `3.0.0` is a semver-major release line. It intentionally does not
+publish the new capture API as `2.x` because several public APIs changed:
+
+| 2.x behavior | 3.x replacement |
+| --- | --- |
+| `Factory` root export | Use `create(options)` from the package root. |
+| `create(options, type)` platform/backend override | Use `create(options)`; backend selection is automatic and capability-aware. |
+| `capture({ type, returnType })` or `responseType` | Use `capture({ location, options })`; it always resolves to `WebcamCaptureResult`. |
+| Buffer/base64 response modes | Use `result.buffer` or `result.toBase64()`. |
+| `list(type)` platform override | Use `listWebcams({ timeout, signal })` or `list()` for the current platform. |
+| Deep imports from `dist/*` | Import only from `@anthonylzq/node-webcam`. |
+
+The explicit root-only `exports` map is part of the 3.x contract. Backend
+implementations, native bindings, and build output paths are internal and may
+change without being exposed as supported subpaths.
+
 ### Linux
 
+Linux uses the bundled native V4L2 addon when a matching prebuild is available,
+then falls back to `ffmpeg` when it is installed, and finally to `fswebcam`.
+The native backend currently supports single-planar V4L2 streaming devices that
+accept MJPEG at the requested resolution exactly. Linux camera listing uses the
+same capability filter when the native addon is available, so multi-planar-only
+devices are not advertised until the capture path supports them. That filter
+uses synchronous native V4L2 `open()`/`VIDIOC_QUERYCAP` calls, so avoid running
+Linux camera listing on latency-sensitive request paths if you have unreliable
+camera drivers.
+
 ```
-# Linux relies on fswebcam currently
+# Optional fallback backends
 # ubuntu
 
-sudo apt-get install fswebcam
+sudo apt-get install ffmpeg fswebcam
 
 # arch
-# fswebcam requires a build from the AUR, it is not listed for installation on pacman/pamac
+# fswebcam requires a build from the AUR
 
-sudo pamac build fswebcam
+yay -S ffmpeg fswebcam
 ```
 
 ### Mac OSX
 
+macOS uses `ffmpeg` when it is installed, then falls back to `imagesnap`.
+
 ```
-# Mac OSX relies on imagesnap
+# Optional preferred backend
+brew install ffmpeg
+
+# Legacy fallback backend
 # Repo https://github.com/rharder/imagesnap
-# Available through brew
 
 brew install imagesnap
 ```
 
 ### Windows
 
-Standalone exe included. See [src/bindings/CommandCam](https://github.com/chuckfairy/node-webcam/tree/master/src/bindings/CommandCam)
+Windows uses `ffmpeg` when it is installed and a camera `device` name is
+provided, then falls back to `CommandCam.exe`. CommandCam is installed by an
+explicit setup command so package installation does not depend on lifecycle
+scripts:
+
+```sh
+npx @anthonylzq/node-webcam setup windows
+```
+
+The setup command downloads the CommandCam release asset on Windows, verifies
+its SHA-256 checksum, and stores it in the user-local `node-webcam` cache. The
+CommandCam release tag and checksum are pinned in `package.json` and only need
+updates when that binary changes. Set `NODE_WEBCAM_COMMANDCAM_PATH` to use a
+manually installed executable instead.
+
+On Windows, prefer device names returned by `listWebcams()` such as
+`"Integrated Webcam"`. ffmpeg interprets `device` as a DirectShow device name.
+CommandCam supports the same friendly names with `/devname` and also supports
+1-based numeric indexes with `/devnum`. Numeric strings such as `"1"` are
+treated as CommandCam indexes and skip ffmpeg selection. CommandCam only
+supports BMP output; requests for `jpeg`, `jpg`, or `png` require ffmpeg and
+fail clearly if the fallback would be CommandCam.
+
+## Backend selection
+
+`capture()` and `create()` choose the first compatible available backend for
+the current platform. The public API does not require backend selection.
+
+```mermaid
+flowchart LR
+  A["capture()"] --> B{"Platform"}
+  B -->|Linux| C["native:v4l2"]
+  C -->|unavailable| D["ffmpeg:v4l2"]
+  D -->|unavailable| E["fswebcam"]
+  B -->|macOS| F["ffmpeg:avfoundation"]
+  F -->|unavailable| G["imagesnap"]
+  B -->|Windows| H["ffmpeg:dshow"]
+  H -->|unavailable| I["CommandCam"]
+```
+
+| Platform | Selection order |
+| --- | --- |
+| Linux | `native:v4l2` -> `ffmpeg:v4l2` -> `fswebcam` |
+| macOS | `ffmpeg:avfoundation` -> `imagesnap` |
+| Windows | `ffmpeg:dshow` -> `CommandCam` |
+
+Backend capability checks can change that order:
+
+| Requested options | Eligible backends |
+| --- | --- |
+| Basic snapshots (`width`, `height`, `output`, `device`, `timeout`, `save`) | Native and ffmpeg backends are considered first when supported by the platform. |
+| Legacy capture options (`quality`, `delay`, `frames`, `title`, `subtitle`, `timestamp`, `greyScale`, `rotation`, `topBanner`, `bottomBanner`, `skip`) | Legacy backends only: `fswebcam`, `imagesnap`, or `CommandCam`. |
+| Explicit `ffmpegPath` on Linux | Skips native Linux and checks ffmpeg first. |
+| `signal` cancellation | Uses command backends; native Linux capture is skipped because the addon does not yet accept `AbortSignal`. |
+| `bmp` output | Requires a BMP-capable backend: `ffmpeg` on Linux/macOS/Windows or `CommandCam` on Windows. The `fswebcam` Linux fallback rejects BMP before command execution. |
+
+Selection is re-evaluated for each `create()` call so camera hotplug, PATH,
+environment, and permission changes are not hidden by a global cache. ffmpeg
+availability is checked with `ffmpeg -version`; it does not open or capture from
+the camera during selection. The probe has its own short timeout, even when
+capture `timeout` is disabled. ffmpeg selection also requires a compatible
+device signal: Linux devices must exist and pass the V4L2 capture-capability
+filter when the native probe is available, macOS requires an explicit
+AVFoundation device, and Windows numeric device strings are reserved for
+CommandCam. The non-destructive ffmpeg check does not prove that a DirectShow or
+AVFoundation device name exists; invalid names fail during capture and do not
+trigger another backend fallback after capture has started. `clearBackendCaches()`
+is exported for forwards compatibility and also backs the deprecated
+`clearBackendSelectionCache()` alias.
+
+Fallback only happens while selecting a backend. If the selected backend starts
+a capture and fails because of permissions, an invalid device, a timeout, or an
+unsupported format, the error is surfaced instead of silently trying the next
+backend. The backend used for a capture is available as `result.backend` and
+`result.backendType`.
+
+## Native webcam performance
+
+The Linux native V4L2 backend avoids spawning a CLI for every capture, so it is
+usually faster for repeated webcam snapshots. Local benchmark snapshot:
+
+| Backend | 100 captures total | Mean | Median | p95 | Avg bytes |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `native:v4l2` | 28.92s | 289.24ms | 287.97ms | 288.72ms | 163,029 |
+| `fswebcam` | 36.16s | 361.59ms | 365.52ms | 371.97ms | 96,015 |
+| `ffmpeg:v4l2` | 37.51s | 375.09ms | 370.60ms | 385.05ms | 59,196 |
+
+Relative mean latency, scaled to the slowest backend in this run:
+
+| Backend | Mean latency | Relative bar |
+| --- | ---: | --- |
+| `native:v4l2` | 289.24ms | `███████████████░░░░░` |
+| `fswebcam` | 361.59ms | `███████████████████░` |
+| `ffmpeg:v4l2` | 375.09ms | `████████████████████` |
+
+Benchmark environment: Linux, `/dev/video0`, `1280x720`, 100 captures per
+backend. Results vary by camera, driver, resolution, codec, CPU, and whether
+the first capture is warmed up.
+
+Reproduce locally:
+
+```bash
+npm run benchmark:capture -- --iterations=100 --warmup=3 --backends=native,ffmpeg,fswebcam
+```
+
+The benchmark writes JSON and Markdown reports under `tmp/`:
+
+```txt
+tmp/benchmark-results.json
+tmp/benchmark-results.md
+tmp/benchmarks/<run-id>/results.json
+tmp/benchmarks/<run-id>/results.md
+```
 
 ## Usage
 
 ### API Usage
 
+All supported public APIs are exported from the package root:
+
+```ts
+import {
+  capture,
+  clearBackendCaches,
+  create,
+  defaults,
+  getMetricsReport,
+  listWebcams,
+  resetMetrics,
+  WebcamError,
+  type NodeWebcamConfig,
+  type WebcamCaptureResult
+} from '@anthonylzq/node-webcam'
+```
+
+Deep imports such as `@anthonylzq/node-webcam/dist/*` are intentionally not
+supported. The package uses an explicit `exports` map so internal build layout,
+native bindings, and backend implementations can change without becoming public
+API.
+
 - The simplest use case:
 
   ```ts
-  import { platform } from 'os'
   import { capture } from '@anthonylzq/node-webcam'
 
   const main = async () => {
-    // base64 as default
     const result = await capture({
-      location: resolve(__dirname, 'picture.jpeg'),
-      type: platform()
+      location: 'picture.jpeg'
     })
 
-    console.log('result', result)
+    console.log('buffer', result.buffer)
+    console.log('base64', result.toBase64())
   }
   ```
+
+  On Windows without an eligible ffmpeg device, the CommandCam fallback only
+  supports BMP output. Use a `.bmp` location there, or install/configure ffmpeg
+  for `jpeg`, `jpg`, or `png` captures.
 
 - In case you want to use another file type such as `jpg`, `png` or `bmp` you **must** indicate it in the `options` object, otherwise you will get an error:
 
   ```ts
-  import { platform } from 'os'
   import { capture } from '@anthonylzq/node-webcam'
 
   const main = async () => {
     const result = await capture({
-      location: resolve(__dirname, 'picture.png'),
-      type: platform(),
-      returnType: 'buffer'
+      location: 'picture.png',
       options: {
         output: 'png'
       }
     })
 
-    console.log('result', result)
+    console.log('buffer', result.buffer)
   }
   ```
 
-  This is because in order to build properly the base64 image both attributes must match.
+  This is because in order to build the captured image correctly the file extension and output type must match.
+
+- If you only need the returned buffer and want to skip file persistence, set `save` to `false`:
+
+  ```ts
+  import { capture } from '@anthonylzq/node-webcam'
+
+  const result = await capture({
+    location: 'picture.jpeg',
+    options: {
+      save: false
+    }
+  })
+
+  console.log(result.buffer)
+  ```
+
+  You can also provide a custom save handler:
+
+  ```ts
+  await capture({
+    location: 'picture.jpeg',
+    options: {
+      save: async (path, buffer) => {
+        await uploadSomewhere(path, buffer)
+        return false
+      }
+    }
+  })
+  ```
 
 - In case you need something more advance you can use the `create` function that will give you a class that will handle the usage of the webcam for you.
 
   ```ts
-  import { platform } from 'os'
   import { create } from '@anthonylzq/node-webcam'
 
-  // The supported platforms are: linux, darwin, win32 and win64.
-  // Besides you can use 'fswebcam' as second parameter instead of "platform()"
-  const Webcam = create({}, platform())
+  const webcam = create()
   ```
 
-- In case you want to list the available cameras in your OS, you can use the `list` function:
+- In case you want to list the available cameras in your OS, you can use the `listWebcams` function:
 
   ```ts
-  import { platform } from 'os'
-  import { create } from '@anthonylzq/node-webcam'
+  import { listWebcams } from '@anthonylzq/node-webcam'
 
-  const cameras = create({}, platform())
+  const cameras = await listWebcams()
   ```
 
 - The default configuration for all the webcams classes and methods can be found in the `defaults` object:
@@ -108,15 +308,17 @@ Standalone exe included. See [src/bindings/CommandCam](https://github.com/chuckf
    * {
    *   width: 1280,
    *   height: 720,
+   *   quality: 100,
    *   delay: 0,
    *   title: '',
    *   subtitle: '',
    *   timestamp: '',
+   *   save: true,
    *   saveShots: true,
    *   output: 'jpeg',
    *   device: '',
-   *   callbackReturn: 'location',
    *   verbose: false,
+   *   timeout: 0,
    *   frames: 1,
    *   greyScale: false,
    *   rotation: 0,
@@ -126,6 +328,36 @@ Standalone exe included. See [src/bindings/CommandCam](https://github.com/chuckf
    * }
    */
   ```
+
+- In case you want aggregate capture metrics, you can use the optional metrics helpers:
+
+  ```ts
+  import { getMetricsReport, resetMetrics } from '@anthonylzq/node-webcam'
+
+  const metrics = getMetricsReport()
+
+  console.log(metrics.captures.total)
+  console.log(metrics.captures.averageElapsedMs)
+
+  resetMetrics()
+  ```
+
+## Maintainer packaging
+
+Publishing is manual. The only supported release-candidate command is:
+
+```bash
+npm run publish:check
+```
+
+That command rebuilds the Linux x64 glibc native prebuild, writes
+`prebuilds/native-manifest.json`, and runs the package validator. The validator
+checks that the manifest hashes match the native sources, `binding.gyp`, and the
+bundled `.node` prebuild so stale native artifacts fail before publication.
+Direct `npm pack` runs a `prepack` freshness check, but it does not rebuild the
+native prebuild; use it only for local inspection, not publication. Never
+publish a tarball produced with `npm pack --ignore-scripts` because that skips
+the freshness checks entirely.
 
 ## Author
 

@@ -1,67 +1,157 @@
-import { exec } from 'child_process'
-import { promisify } from 'util'
-import { resolve } from 'path'
+import { mkdtempSync } from 'fs'
+import { tmpdir } from 'os'
+import { extname, join } from 'path'
 
-import type { WebcamConfig } from 'types'
-import { BaseWebcam } from './BaseWebcam'
+import { WebcamError } from '../errors'
+import type { WebcamConfig } from '../types'
+import { getPlatformCameras, resolveCommandCamPath } from '../utils'
+import { BaseWebcam, WebcamCommand } from './BaseWebcam'
 
-const asyncExec = promisify(exec)
+const COMMAND_CAM_MAX_ARGUMENT_BYTES = 99
+const COMMAND_CAM_SUPPORTED_OUTPUT = 'bmp'
+const commandCamDeviceNumberPattern = /^[1-9]\d*$/
+const commandCamUnsupportedOutputExtensions = new Set(['jpeg', 'jpg', 'png'])
+let commandCamTemporaryCaptureCounter = 0
+
+const createUnsupportedCommandCamOutputError = (output: string) =>
+  new WebcamError({
+    code: 'UNSUPPORTED_OUTPUT_FORMAT',
+    message:
+      'CommandCam only supports bmp output. Install ffmpeg for jpeg, jpg, or png capture on Windows.',
+    details: {
+      backend: 'CommandCam',
+      output,
+      supportedOutputs: [COMMAND_CAM_SUPPORTED_OUTPUT]
+    }
+  })
+
+const getCommandCamDeviceArgs = (device: WebcamConfig['device']) => {
+  if (typeof device !== 'string') return []
+
+  const normalizedDevice = device.trim()
+
+  if (!normalizedDevice) return []
+
+  return commandCamDeviceNumberPattern.test(normalizedDevice)
+    ? ['/devnum', normalizedDevice]
+    : ['/devname', normalizedDevice]
+}
+
+const quoteCommandCamShellArg = (arg: string) =>
+  /\s/.test(arg) ? `"${arg}"` : arg
+
+const createCommandCamTemporaryCapturePath = (path: string) => {
+  commandCamTemporaryCaptureCounter += 1
+  const directory = mkdtempSync(join(tmpdir(), 'nw-'))
+
+  return {
+    cleanupPath: directory,
+    path: join(
+      directory,
+      `c-${commandCamTemporaryCaptureCounter.toString(36)}${extname(path)}`
+    )
+  }
+}
+
+const validateCommandCamOutputExtension = (path: string) => {
+  const extension = extname(path).slice(1).toLowerCase()
+
+  if (commandCamUnsupportedOutputExtensions.has(extension))
+    throw createUnsupportedCommandCamOutputError(extension)
+}
 
 class WindowsWebcam extends BaseWebcam {
   #bin: string
 
   constructor(options?: Partial<WebcamConfig>) {
-    super({ ...options, output: 'bmp' })
-    this.#bin = resolve(
-      __dirname,
-      '..',
-      'bindings',
-      'CommandCam',
-      'CommandCam.exe'
-    )
+    if (options?.output && options.output !== COMMAND_CAM_SUPPORTED_OUTPUT)
+      throw createUnsupportedCommandCamOutputError(options.output)
+
+    super({ ...options, output: COMMAND_CAM_SUPPORTED_OUTPUT })
+    this.#bin = resolveCommandCamPath()
 
     if (options?.delay) super.setDelayInMilliseconds()
   }
 
+  /**
+   * @deprecated Use `generateCommand()` for safe argument-based execution.
+   */
   generateSh(location: string): string {
-    const { options } = this
-    const device = options.device ? `/devnum ${options.device}` : ''
-    const delay = options.delay ? `/delay ${options.delay}` : ''
+    this.validateOutputPath(location)
 
-    return `${this.#bin} ${delay} ${device} /filename ${location}`.replace(
-      / +/g,
-      ' '
-    )
+    const { options } = this
+    const args = [
+      ...(options.delay ? ['/delay', String(options.delay)] : []),
+      ...getCommandCamDeviceArgs(options.device),
+      '/filename',
+      location
+    ]
+
+    return [this.#bin, ...args.map(quoteCommandCamShellArg)].join(' ')
+  }
+
+  generateCommand(location: string): WebcamCommand {
+    this.validateOutputPath(location)
+
+    const { options } = this
+    const args = []
+
+    if (options.delay) args.push('/delay', String(options.delay))
+    args.push(...getCommandCamDeviceArgs(options.device))
+
+    args.push('/filename', location)
+
+    return { file: this.#bin, args }
+  }
+
+  protected validateOutputPath(path: string) {
+    super.validateOutputPath(path)
+    validateCommandCamOutputExtension(path)
+
+    const bytes = Buffer.byteLength(path, 'utf8')
+
+    if (path.includes('"'))
+      throw new WebcamError({
+        code: 'INVALID_OUTPUT_PATH',
+        message:
+          'Invalid Windows output path, CommandCam paths must not contain double quotes',
+        details: { path }
+      })
+
+    if (bytes > COMMAND_CAM_MAX_ARGUMENT_BYTES)
+      throw new WebcamError({
+        code: 'INVALID_OUTPUT_PATH',
+        message: `Invalid Windows output path, CommandCam paths must be ${COMMAND_CAM_MAX_ARGUMENT_BYTES} bytes or less: ${bytes}`,
+        details: {
+          bytes,
+          maxBytes: COMMAND_CAM_MAX_ARGUMENT_BYTES,
+          path
+        }
+      })
+  }
+
+  protected validateCapturePath(path: string) {
+    super.validateOutputPath(path)
+    validateCommandCamOutputExtension(path)
+  }
+
+  protected shouldUseTemporaryCapturePath() {
+    return true
+  }
+
+  protected createTemporaryCaptureTarget(path: string) {
+    return createCommandCamTemporaryCapturePath(path)
   }
 
   async listWebcams(): Promise<string[]> {
-    const sh = `${this.#bin} /devlist`
-    const result = await asyncExec(sh)
+    const { options } = this
 
-    if (result.stderr) {
-      if (this.options.verbose)
-        console.error('Error while listing webcams: ', result.stderr)
-
-      throw new Error(result.stderr)
-    }
-
-    const lines = result.stdout.split('\n')
-
-    return lines.reduce<string[]>((acc, line) => {
-      const formattedLine = line.replace('\r', '')
-
-      if (
-        ['Available capture devices:', 'Available capture devices:'].includes(
-          formattedLine
-        ) ||
-        !formattedLine
-      )
-        return acc
-
-      acc.push(formattedLine)
-
-      return acc
-    }, [])
+    return getPlatformCameras({
+      platform: 'win32',
+      signal: options.signal,
+      timeout: options.timeout,
+      windowsCommandCamPath: this.#bin
+    })
   }
 }
 
