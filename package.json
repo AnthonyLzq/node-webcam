@@ -16,6 +16,7 @@
     "check": "npm run typecheck && npm run lint:check && npm test",
     "setup:windows": "node ./bin/node-webcam.js setup windows",
     "demo": "npm run build && ts-node examples/websocket/App.ts",
+    "install": "node -e \"\"",
     "lint": "npm run lint:check",
     "lint:check": "eslint benchmarks src tests --ext .ts",
     "lint:fix": "eslint --fix benchmarks src tests --ext .ts",
