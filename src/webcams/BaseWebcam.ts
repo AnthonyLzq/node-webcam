@@ -222,11 +222,15 @@ class BaseWebcam {
     }`
   }
 
+  protected getCaptureDeviceKey() {
+    return typeof this.#options.device === 'string' &&
+      this.#options.device.trim()
+      ? this.#options.device.trim()
+      : 'default'
+  }
+
   protected getCaptureQueueKeys(path: string) {
-    const device =
-      typeof this.#options.device === 'string' && this.#options.device.trim()
-        ? this.#options.device.trim()
-        : 'default'
+    const device = this.getCaptureDeviceKey()
 
     return [
       `capture:device:${process.platform}:${device}`,

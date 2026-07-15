@@ -179,6 +179,13 @@ class FFmpegWebcam extends BaseWebcam {
   protected getBackendType() {
     return 'ffmpeg' as const
   }
+
+  protected getCaptureDeviceKey() {
+    if (this.#platform === 'linux')
+      return FFmpegWebcam.getDevice(this.options, 'linux')
+
+    return super.getCaptureDeviceKey()
+  }
 }
 
 export { FFmpegWebcam }

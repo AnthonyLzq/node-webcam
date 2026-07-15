@@ -130,6 +130,16 @@ class SecondFakeBackendWebcam extends FakeCaptureWebcam {
   }
 }
 
+class LinuxDeviceKeyWebcam extends FakeCaptureWebcam {
+  protected getCaptureDeviceKey() {
+    const { device } = this.options
+
+    return typeof device === 'string' && device.trim()
+      ? device.trim()
+      : '/dev/video0'
+  }
+}
+
 class CommandWebcam extends BaseWebcam {
   #command: WebcamCommand
 
@@ -542,6 +552,34 @@ describe('BaseWebcam', () => {
       ])
 
       assert.equal(webcam.maxActiveCaptures, 1)
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
+  })
+
+  it('serializes Linux default device captures with explicit /dev/video0', async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'node-webcam-'))
+    const firstPath = join(directory, 'first.png')
+    const secondPath = join(directory, 'second.png')
+    const defaultDeviceWebcam = new LinuxDeviceKeyWebcam({
+      output: 'png',
+      saveShots: false
+    })
+    const explicitDeviceWebcam = new LinuxDeviceKeyWebcam({
+      device: '/dev/video0',
+      output: 'png',
+      saveShots: false
+    })
+
+    FakeCaptureWebcam.resetGlobalCaptures()
+
+    try {
+      await Promise.all([
+        defaultDeviceWebcam.capture({ location: firstPath }),
+        explicitDeviceWebcam.capture({ location: secondPath })
+      ])
+
+      assert.equal(FakeCaptureWebcam.maxActiveCaptures, 1)
     } finally {
       rmSync(directory, { recursive: true, force: true })
     }

@@ -86,9 +86,18 @@ class FSWebcam extends BaseWebcam {
     const {
       options: { device }
     } = this
+
     const devSwitch = device ? ' --device=' + device.trim() : ''
 
     return `${this.#bin} ${devSwitch} --list-controls`
+  }
+
+  protected getCaptureDeviceKey() {
+    const { device } = this.options
+
+    return typeof device === 'string' && device.trim()
+      ? device.trim()
+      : '/dev/video0'
   }
 }
 

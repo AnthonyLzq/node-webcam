@@ -114,6 +114,14 @@ class NativeLinuxWebcam extends BaseWebcam {
     return 'image/jpeg'
   }
 
+  protected getCaptureDeviceKey() {
+    const { device } = this.options
+
+    return typeof device === 'string' && device.trim()
+      ? device.trim()
+      : '/dev/video0'
+  }
+
   protected createCaptureExecution(): WebcamCaptureExecution {
     const { options } = this
     const device =
