@@ -148,6 +148,20 @@ describe('camera listing', () => {
     )
   })
 
+  it('parses imagesnap camera names from arrow-prefixed output', () => {
+    assert.deepEqual(
+      parseImageSnapCameras(
+        [
+          'Video Devices:',
+          '=> FaceTime HD Camera',
+          '=> Logitech BRIO',
+          ''
+        ].join('\n')
+      ),
+      ['FaceTime HD Camera', 'Logitech BRIO']
+    )
+  })
+
   it('parses Windows CommandCam device output', () => {
     assert.deepEqual(
       parseWindowsCameras(
@@ -271,6 +285,41 @@ describe('camera listing', () => {
         code: 'INVALID_CONFIG_OPTION',
         message:
           'Invalid webcam option "timeout": expected a number less than or equal to 2147483647, received 9007199254740991',
+        name: 'WebcamError'
+      }
+    )
+  })
+
+  it('rejects invalid camera listing abort signals before execution', async () => {
+    await assert.rejects(
+      () =>
+        getPlatformCameras({
+          platform: 'darwin',
+          signal: {
+            aborted: false,
+            addEventListener: () => undefined
+          } as unknown as AbortSignal
+        }),
+      {
+        code: 'INVALID_CONFIG_OPTION',
+        message:
+          'Invalid webcam option "signal": expected an AbortSignal-like object, received {"aborted":false}',
+        name: 'WebcamError'
+      }
+    )
+  })
+
+  it('rejects invalid top-level listWebcams abort signals', async () => {
+    await assert.rejects(
+      () =>
+        listWebcams({
+          signal: {
+            aborted: false,
+            addEventListener: () => undefined
+          } as unknown as AbortSignal
+        }),
+      {
+        code: 'INVALID_CONFIG_OPTION',
         name: 'WebcamError'
       }
     )

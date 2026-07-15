@@ -11,7 +11,7 @@ import {
 } from '../errors'
 import { loadNativeWebcamAddon, type NativeWebcamAddon } from '../native'
 import { resolveCommandCamPath } from './commandCam'
-import { validateTimeoutOption } from './helpers'
+import { validateSignalOption, validateTimeoutOption } from './helpers'
 
 const asyncExecFile = promisify(execFile)
 const linuxVideoDevicePattern = /^video\d+$/i
@@ -135,7 +135,13 @@ const parseImageSnapCameras = (stdout: string) => {
   return lines.reduce<string[]>((acc, line) => {
     if (line === 'Video Devices:' || !line) return acc
 
-    acc.push(line.replace(/.*?\[(.*?)\].*/, '$1'))
+    const normalizedLine = line.replace(/^=>\s*/, '').trim()
+
+    if (!normalizedLine) return acc
+
+    const bracketMatch = normalizedLine.match(/\[(.*?)\]/)
+
+    acc.push(bracketMatch ? bracketMatch[1] : normalizedLine)
 
     return acc
   }, [])
@@ -161,6 +167,7 @@ const runCameraListCommand = async (
   { signal, timeout = 0 }: Pick<GetCamerasOptions, 'signal' | 'timeout'> = {}
 ) => {
   validateTimeoutOption(timeout)
+  validateSignalOption(signal)
 
   try {
     const result = await asyncExecFile(file, args, {
@@ -204,6 +211,9 @@ const getPlatformCameras = async ({
   timeout = 0,
   windowsCommandCamPath
 }: GetCamerasOptions = {}) => {
+  validateSignalOption(signal)
+  validateTimeoutOption(timeout)
+
   switch (platform) {
     case 'linux':
       return getLinuxCameras()

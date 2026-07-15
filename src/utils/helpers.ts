@@ -28,8 +28,25 @@ const maxTimeoutMs = 2_147_483_647
 
 const describeValue = (value: unknown) => {
   if (typeof value === 'number' && Number.isNaN(value)) return 'NaN'
+  if (typeof value === 'bigint') return `${value.toString()}n`
+  if (typeof value === 'symbol') return value.toString()
+  if (typeof value === 'function')
+    return `[function ${value.name || 'anonymous'}]`
+  if (value === undefined) return 'undefined'
 
-  return JSON.stringify(value)
+  try {
+    const json = JSON.stringify(value)
+
+    if (json !== undefined) return json
+  } catch (_error) {
+    // Fall through to stringification below for circular objects or throwing toJSON.
+  }
+
+  try {
+    return String(value)
+  } catch (_error) {
+    return Object.prototype.toString.call(value)
+  }
 }
 
 const throwInvalidOption = (
@@ -129,6 +146,11 @@ const isAbortSignalLike = (value: unknown): value is AbortSignal =>
   typeof (value as { removeEventListener?: unknown }).removeEventListener ===
     'function'
 
+const validateSignalOption = (signal: unknown) => {
+  if (signal !== undefined && !isAbortSignalLike(signal))
+    throwInvalidOption('signal', 'an AbortSignal-like object', signal)
+}
+
 const validateWebcamConfig = (config: WebcamConfig) => {
   validateFiniteNumber(config, 'width', { integer: true, min: 1, max: 16_384 })
   validateFiniteNumber(config, 'height', { integer: true, min: 1, max: 16_384 })
@@ -165,8 +187,7 @@ const validateWebcamConfig = (config: WebcamConfig) => {
   if (config.ffmpegPath !== undefined && typeof config.ffmpegPath !== 'string')
     throwInvalidOption('ffmpegPath', 'a string', config.ffmpegPath)
 
-  if (config.signal !== undefined && !isAbortSignalLike(config.signal))
-    throwInvalidOption('signal', 'an AbortSignal-like object', config.signal)
+  validateSignalOption(config.signal)
 }
 
 const setDefaults = (options: Partial<WebcamConfig> = {}): WebcamConfig => {
@@ -180,4 +201,10 @@ const setDefaults = (options: Partial<WebcamConfig> = {}): WebcamConfig => {
   return config
 }
 
-export { setDefaults, defaults, validateTimeoutOption, validateWebcamConfig }
+export {
+  setDefaults,
+  defaults,
+  validateSignalOption,
+  validateTimeoutOption,
+  validateWebcamConfig
+}

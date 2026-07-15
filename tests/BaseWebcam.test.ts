@@ -199,6 +199,7 @@ describe('BaseWebcam', () => {
       ['height', { height: Number.NaN }],
       ['timeout', { timeout: 0.5 }],
       ['timeout max', { timeout: Number.MAX_SAFE_INTEGER }],
+      ['timeout bigint', { timeout: 1n as unknown as number }],
       ['frames', { frames: 0 }],
       ['delay', { delay: -1 }],
       ['quality', { quality: 101 }],
@@ -210,6 +211,26 @@ describe('BaseWebcam', () => {
       ['save', { save: 'yes' as unknown as true }],
       ['ffmpegPath', { ffmpegPath: false as unknown as string }],
       ['signal', { signal: { aborted: false } as unknown as AbortSignal }],
+      [
+        'device circular',
+        (() => {
+          const value: Record<string, unknown> = {}
+
+          value.self = value
+
+          return { device: value as unknown as string }
+        })()
+      ],
+      [
+        'device throwing toJSON',
+        {
+          device: {
+            toJSON: () => {
+              throw new Error('no stringify')
+            }
+          } as unknown as string
+        }
+      ],
       [
         'signal removeEventListener',
         {
