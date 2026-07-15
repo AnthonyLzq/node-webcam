@@ -32,13 +32,36 @@ const requiredNativeManifestSources = [
   'native/unsupported.cc'
 ]
 
-const exec = (command, args, options = {}) =>
-  execFileSync(command, args, {
+const execNode = (args, options = {}) =>
+  execFileSync(process.execPath, args, {
     cwd: root,
-    encoding: 'utf8',
-    stdio: ['ignore', 'pipe', 'pipe'],
+    stdio: 'ignore',
     ...options
   })
+
+const quoteCmdArg = arg => `"${String(arg).replace(/"/g, '""')}"`
+
+const execNpm = (args, options = {}) => {
+  if (process.env.npm_execpath && existsSync(process.env.npm_execpath))
+    return execNode([process.env.npm_execpath, ...args], options)
+
+  if (process.platform === 'win32')
+    return execFileSync(
+      process.env.ComSpec || 'cmd.exe',
+      ['/d', '/s', '/c', ['npm', ...args.map(quoteCmdArg)].join(' ')],
+      {
+        cwd: root,
+        stdio: 'ignore',
+        ...options
+      }
+    )
+
+  return execFileSync('npm', args, {
+    cwd: root,
+    stdio: 'ignore',
+    ...options
+  })
+}
 
 const parsePackOutput = output => {
   const start = output.indexOf('[')
@@ -122,7 +145,10 @@ let consumerDirectory
 let lifecycleConsumerDirectory
 
 try {
-  const pack = parsePackOutput(exec('npm', ['pack', '--json', '--ignore-scripts']))
+  const pack = parsePackOutput(execNpm(['pack', '--json', '--ignore-scripts'], {
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe']
+  }))
   tarballPath = join(root, pack.filename)
   const packageEntries = pack.files.map(file => file.path)
   const packageJson = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
@@ -198,8 +224,7 @@ try {
   )
   writeFileSync(commandCamFixturePath, '')
 
-  execFileSync(
-    'npm',
+  execNpm(
     [
       'install',
       '--ignore-scripts',
@@ -228,8 +253,7 @@ try {
     )
   )
 
-  execFileSync(
-    'npm',
+  execNpm(
     [
       'install',
       '--no-audit',
@@ -243,8 +267,7 @@ try {
     }
   )
 
-  execFileSync(
-    process.execPath,
+  execNode(
     [
       '-e',
       [
@@ -275,7 +298,7 @@ try {
     ].join('\n')
   )
 
-  execFileSync(process.execPath, ['index.mjs'], {
+  execNode(['index.mjs'], {
     cwd: consumerDirectory,
     env: consumerEnv,
     stdio: 'ignore'
@@ -335,17 +358,25 @@ try {
 
   if (!existsSync(tscPath)) throw new Error(`Missing TypeScript compiler: ${tscPath}`)
 
-  execFileSync(process.execPath, [tscPath, '-p', 'tsconfig.json'], {
+  execNode([tscPath, '-p', 'tsconfig.json'], {
     cwd: consumerDirectory,
     env: consumerEnv,
     stdio: 'ignore'
   })
 
-  execFileSync(
-    process.platform === 'win32'
-      ? join(consumerDirectory, 'node_modules', '.bin', 'node-webcam.cmd')
-      : join(consumerDirectory, 'node_modules', '.bin', 'node-webcam'),
-    ['setup', 'windows'],
+  execNode(
+    [
+      join(
+        consumerDirectory,
+        'node_modules',
+        '@anthonylzq',
+        'node-webcam',
+        'bin',
+        'node-webcam.js'
+      ),
+      'setup',
+      'windows'
+    ],
     {
       cwd: consumerDirectory,
       env: consumerEnv,
