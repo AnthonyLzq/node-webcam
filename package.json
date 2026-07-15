@@ -31,7 +31,7 @@
     "prepublishOnly": "npm run publish:check",
     "publish:check": "node scripts/publish-check.js",
     "typecheck": "tsc --noEmit",
-    "test": "node --test -r ts-node/register \"tests/**/*.test.ts\"",
+    "test": "node scripts/run-tests.js",
     "release": "standard-version",
     "version": "npm run release && git add .",
     "rm:dist": "node scripts/clean-dist.js"

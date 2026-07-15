@@ -40,7 +40,11 @@ const execNode = (args, options = {}) =>
     ...options
   })
 
-const quoteCmdArg = arg => `"${String(arg).replace(/"/g, '""')}"`
+const quoteCmdArg = arg => {
+  const value = String(arg)
+
+  return /[\s"&|<>^]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value
+}
 
 const execNpm = (args, options = {}) => {
   if (process.env.npm_execpath && existsSync(process.env.npm_execpath))
