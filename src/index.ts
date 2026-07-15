@@ -23,6 +23,7 @@ type ListRequest = Pick<Partial<WebcamConfig>, 'signal' | 'timeout'>
 type Platform = 'darwin' | 'linux' | 'win32'
 
 const supportedPlatforms = ['linux', 'darwin', 'win32']
+const topLevelCaptureQueues = new Map<string, Promise<void>>()
 type BackendSelection =
   | 'ffmpeg'
   | 'fswebcam'
@@ -78,6 +79,50 @@ const windowsCommandCamDeviceNumberPattern = /^[1-9]\d*$/
 const isWindowsCommandCamDeviceNumber = (options: Partial<WebcamConfig>) =>
   typeof options.device === 'string' &&
   windowsCommandCamDeviceNumberPattern.test(options.device.trim())
+
+const runTopLevelCaptureQueue = async <T>(
+  key: string,
+  task: () => Promise<T>
+) => {
+  const previous = topLevelCaptureQueues.get(key) ?? Promise.resolve()
+
+  let release!: () => void
+  const current = previous
+    .catch(() => undefined)
+    .then(
+      () =>
+        new Promise<void>(resolve => {
+          release = resolve
+        })
+    )
+
+  topLevelCaptureQueues.set(key, current)
+
+  await previous.catch(() => undefined)
+
+  try {
+    return await task()
+  } finally {
+    release()
+
+    if (topLevelCaptureQueues.get(key) === current)
+      topLevelCaptureQueues.delete(key)
+  }
+}
+
+const getTopLevelCaptureDeviceKey = (
+  options: Partial<WebcamConfig>,
+  platform: string
+) => {
+  const device =
+    typeof options.device === 'string' && options.device.trim()
+      ? options.device.trim()
+      : platform === 'linux'
+      ? '/dev/video0'
+      : 'default'
+
+  return `capture:device:${platform}:${device}`
+}
 
 const instantiateBackend = (
   backend: BackendSelection,
@@ -177,14 +222,22 @@ const create = (options: Partial<WebcamConfig> = {}): BaseWebcam => {
 
 const clearBackendCaches = () => {
   FFmpegWebcam.clearAvailabilityCache()
+  topLevelCaptureQueues.clear()
 }
 
 const clearBackendSelectionCache = clearBackendCaches
 
 const capture = async ({ location, options = {}, cb }: CaptureRequest = {}) => {
-  const Webcam = create(options)
-  const captureLocation = location ?? `location.${Webcam.options.output}`
-  const result = await Webcam.capture({ location: captureLocation })
+  const currentPlatform = os.platform()
+  const result = await runTopLevelCaptureQueue(
+    getTopLevelCaptureDeviceKey(options, currentPlatform),
+    async () => {
+      const Webcam = create(options)
+      const captureLocation = location ?? `location.${Webcam.options.output}`
+
+      return Webcam.capture({ location: captureLocation })
+    }
+  )
 
   if (cb) cb(result)
 

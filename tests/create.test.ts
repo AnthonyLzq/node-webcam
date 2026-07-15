@@ -155,6 +155,55 @@ describe('create', () => {
     ])
   })
 
+  it('serializes top-level backend selection for Linux default devices', async () => {
+    mock.method(os, 'platform', () => 'linux')
+    mock.method(NativeLinuxWebcam, 'isAvailable', () => false)
+    let ffmpegCaptureActive = false
+    const selectedBackends: string[] = []
+
+    mock.method(FFmpegWebcam, 'isAvailable', () => !ffmpegCaptureActive)
+    mock.method(
+      FFmpegWebcam.prototype,
+      'capture',
+      async ({ location }: { location: string }) => {
+        selectedBackends.push('ffmpeg')
+        ffmpegCaptureActive = true
+
+        try {
+          await new Promise(resolve => setTimeout(resolve, 20))
+
+          return {
+            backend: 'ffmpeg:v4l2',
+            backendType: 'ffmpeg',
+            buffer: Buffer.from([]),
+            bytes: 0,
+            elapsedMs: 0,
+            location,
+            mimeType: 'image/jpeg',
+            queueWaitMs: 0,
+            toBase64: () => ''
+          }
+        } finally {
+          ffmpegCaptureActive = false
+        }
+      }
+    )
+    mock.method(FSWebcam.prototype, 'capture', async () => {
+      selectedBackends.push('fswebcam')
+      throw new Error('fswebcam fallback should not be selected')
+    })
+
+    await Promise.all([
+      capture({ location: 'first.jpeg' }),
+      capture({
+        location: 'second.jpeg',
+        options: { device: '/dev/video0' }
+      })
+    ])
+
+    assert.deepEqual(selectedBackends, ['ffmpeg', 'ffmpeg'])
+  })
+
   it('keeps the deprecated backend selection cache reset as an alias', () => {
     assert.equal(clearBackendSelectionCache, clearBackendCaches)
   })
