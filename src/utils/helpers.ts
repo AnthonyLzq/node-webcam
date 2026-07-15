@@ -24,6 +24,7 @@ const defaults: WebcamConfig = {
 }
 
 const validOutputs: WebcamConfig['output'][] = ['bmp', 'jpeg', 'jpg', 'png']
+const maxTimeoutMs = 2_147_483_647
 
 const describeValue = (value: unknown) => {
   if (typeof value === 'number' && Number.isNaN(value)) return 'NaN'
@@ -108,6 +109,13 @@ const validateTimeoutOption = (timeout: unknown) => {
     throwInvalidOption(
       'timeout',
       'a number greater than or equal to 0',
+      timeoutValue
+    )
+
+  if (timeoutValue > maxTimeoutMs)
+    throwInvalidOption(
+      'timeout',
+      `a number less than or equal to ${maxTimeoutMs}`,
       timeoutValue
     )
 }

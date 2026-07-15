@@ -560,6 +560,25 @@ describe('backend command generation', () => {
     )
   })
 
+  it('rejects oversized ffmpeg availability timeouts before spawning', () => {
+    assert.throws(
+      () =>
+        FFmpegWebcam.isAvailable(
+          {
+            ffmpegPath: 'ffmpeg',
+            timeout: Number.MAX_SAFE_INTEGER
+          },
+          'darwin'
+        ),
+      {
+        code: 'INVALID_CONFIG_OPTION',
+        message:
+          'Invalid webcam option "timeout": expected a number less than or equal to 2147483647, received 9007199254740991',
+        name: 'WebcamError'
+      }
+    )
+  })
+
   posixIt('does not run ffmpeg when the Linux device does not exist', () => {
     const directory = mkdtempSync(join(tmpdir(), 'node-webcam-ffmpeg-'))
     const ffmpeg = join(directory, 'ffmpeg')

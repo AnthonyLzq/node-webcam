@@ -198,6 +198,7 @@ describe('BaseWebcam', () => {
       ['width', { width: 0 }],
       ['height', { height: Number.NaN }],
       ['timeout', { timeout: 0.5 }],
+      ['timeout max', { timeout: Number.MAX_SAFE_INTEGER }],
       ['frames', { frames: 0 }],
       ['delay', { delay: -1 }],
       ['quality', { quality: 101 }],
