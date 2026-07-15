@@ -89,6 +89,19 @@ describe('create', () => {
     assert.ok(webcam instanceof FFmpegWebcam)
   })
 
+  it('rejects bmp output on Linux when only fswebcam fallback remains', () => {
+    mock.method(os, 'platform', () => 'linux')
+    mock.method(NativeLinuxWebcam, 'isAvailable', () => false)
+    mock.method(FFmpegWebcam, 'isAvailable', () => false)
+
+    assert.throws(() => create({ output: 'bmp' }), {
+      code: 'UNSUPPORTED_OUTPUT_FORMAT',
+      message:
+        'fswebcam does not support bmp output. Use jpeg, jpg, png, or install ffmpeg for bmp capture on Linux.',
+      name: 'WebcamError'
+    })
+  })
+
   it('keeps fswebcam on Linux when legacy-only options are requested', () => {
     mock.method(os, 'platform', () => 'linux')
     mock.method(NativeLinuxWebcam, 'isAvailable', () => true)

@@ -132,6 +132,15 @@ describe('backend command generation', () => {
     })
   })
 
+  it('rejects bmp output for fswebcam before command execution', () => {
+    assert.throws(() => new FSWebcam({ output: 'bmp' }), {
+      code: 'UNSUPPORTED_OUTPUT_FORMAT',
+      message:
+        'fswebcam does not support bmp output. Use jpeg, jpg, png, or install ffmpeg for bmp capture on Linux.',
+      name: 'WebcamError'
+    })
+  })
+
   it('preserves the default imagesnap command', () => {
     const webcam = new ImageSnapWebcam({})
     const command = webcam.generateSh('photo.jpeg')

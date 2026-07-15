@@ -1,10 +1,29 @@
+import { WebcamError } from '../errors'
 import type { WebcamConfig } from '../types'
 import { BaseWebcam, WebcamCommand } from './BaseWebcam'
+
+const FSWEBCAM_SUPPORTED_OUTPUTS = ['jpeg', 'jpg', 'png']
+
+const assertSupportedOutput = (output: WebcamConfig['output']) => {
+  if (!FSWEBCAM_SUPPORTED_OUTPUTS.includes(output))
+    throw new WebcamError({
+      code: 'UNSUPPORTED_OUTPUT_FORMAT',
+      message:
+        'fswebcam does not support bmp output. Use jpeg, jpg, png, or install ffmpeg for bmp capture on Linux.',
+      details: {
+        backend: 'fswebcam',
+        output,
+        supportedOutputs: FSWEBCAM_SUPPORTED_OUTPUTS
+      }
+    })
+}
 
 class FSWebcam extends BaseWebcam {
   #bin: string
 
   constructor(options?: Partial<WebcamConfig>) {
+    if (options?.output) assertSupportedOutput(options.output)
+
     super(options)
     this.#bin = 'fswebcam'
 
@@ -18,6 +37,7 @@ class FSWebcam extends BaseWebcam {
     this.validateOutputPath(location)
 
     const options = super.options
+    assertSupportedOutput(options.output)
     const resolution = ` -r ${options.width}x${options.height}`
     const frames = `-F ${options.frames}`
     const delay = `-D ${options.delay}`
@@ -52,6 +72,7 @@ class FSWebcam extends BaseWebcam {
     this.validateOutputPath(location)
 
     const options = super.options
+    assertSupportedOutput(options.output)
     const args = [
       ...(options.verbose ? [] : ['-q']),
       '-r',

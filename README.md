@@ -126,6 +126,7 @@ Backend capability checks can change that order:
 | Legacy capture options (`quality`, `delay`, `frames`, `title`, `subtitle`, `timestamp`, `greyScale`, `rotation`, `topBanner`, `bottomBanner`, `skip`) | Legacy backends only: `fswebcam`, `imagesnap`, or `CommandCam`. |
 | Explicit `ffmpegPath` on Linux | Skips native Linux and checks ffmpeg first. |
 | `signal` cancellation | Uses command backends; native Linux capture is skipped because the addon does not yet accept `AbortSignal`. |
+| `bmp` output | Requires a BMP-capable backend: `ffmpeg` on Linux/macOS/Windows or `CommandCam` on Windows. The `fswebcam` Linux fallback rejects BMP before command execution. |
 
 Selection is re-evaluated for each `create()` call so camera hotplug, PATH,
 environment, and permission changes are not hidden by a global cache. ffmpeg
