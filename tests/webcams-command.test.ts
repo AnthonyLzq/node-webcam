@@ -311,6 +311,41 @@ describe('backend command generation', () => {
     }
   })
 
+  it('persists long CommandCam logical paths through short temporary captures', async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'node-webcam-commandcam-'))
+    const commandCamPath = join(directory, 'CommandCam.exe')
+    const originalCommandCamPath = process.env.NODE_WEBCAM_COMMANDCAM_PATH
+    const targetOverheadBytes = Buffer.byteLength(
+      join(directory, '.bmp'),
+      'utf8'
+    )
+    const target = join(
+      directory,
+      `${'a'.repeat(Math.max(1, 105 - targetOverheadBytes))}.bmp`
+    )
+
+    writeFileSync(commandCamPath, '')
+    process.env.NODE_WEBCAM_COMMANDCAM_PATH = commandCamPath
+
+    try {
+      const webcam = new CapturingWindowsWebcam({ save: true })
+      const result = await webcam.capture({ location: target })
+      const [executionPath] = webcam.executionPaths
+
+      assert.ok(Buffer.byteLength(target, 'utf8') > 99)
+      assert.ok(Buffer.byteLength(executionPath, 'utf8') <= 99)
+      assert.notEqual(executionPath, target)
+      assert.deepEqual([...readFileSync(target)], [1, 2, 3])
+      assert.deepEqual([...result.buffer], [1, 2, 3])
+    } finally {
+      if (originalCommandCamPath === undefined)
+        delete process.env.NODE_WEBCAM_COMMANDCAM_PATH
+      else process.env.NODE_WEBCAM_COMMANDCAM_PATH = originalCommandCamPath
+
+      rmSync(directory, { force: true, recursive: true })
+    }
+  })
+
   it('builds the Linux ffmpeg command', () => {
     const webcam = new FFmpegWebcam(
       {

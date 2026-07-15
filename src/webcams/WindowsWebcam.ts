@@ -132,6 +132,10 @@ class WindowsWebcam extends BaseWebcam {
     validateCommandCamOutputExtension(path)
   }
 
+  protected shouldUseTemporaryCapturePath() {
+    return true
+  }
+
   protected createTemporaryCapturePath(path: string) {
     return createCommandCamTemporaryCapturePath(path)
   }

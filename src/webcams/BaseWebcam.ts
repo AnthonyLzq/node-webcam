@@ -284,7 +284,7 @@ class BaseWebcam {
     }
   }
 
-  private shouldUseTemporaryCapturePath() {
+  protected shouldUseTemporaryCapturePath() {
     // CLI-style backends must write somewhere before BaseWebcam can read the
     // buffer. When persistence is disabled or customized, write to a temporary
     // path first so the requested `location` is not created unless `save` asks
