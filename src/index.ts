@@ -9,7 +9,11 @@ import {
   NativeLinuxWebcam,
   WindowsWebcam
 } from './webcams'
-import { getPlatformCameras, setDefaults } from './utils'
+import {
+  defaults as defaultWebcamConfig,
+  getPlatformCameras,
+  setDefaults
+} from './utils'
 import type { WebcamCaptureResult } from './webcams/BaseWebcam'
 import type { WebcamConfig } from './types'
 
@@ -80,6 +84,15 @@ const isWindowsCommandCamDeviceNumber = (options: Partial<WebcamConfig>) =>
   typeof options.device === 'string' &&
   windowsCommandCamDeviceNumberPattern.test(options.device.trim())
 
+const defaultOptionKeys = Object.keys(defaultWebcamConfig) as Array<
+  keyof WebcamConfig
+>
+
+const hasMaterializedDefaultOutput = (options: Partial<WebcamConfig>) =>
+  hasOwn(options, 'output') &&
+  options.output === defaultWebcamConfig.output &&
+  defaultOptionKeys.every(option => hasOwn(options, option))
+
 const runTopLevelCaptureQueue = async <T>(
   key: string,
   task: () => Promise<T>
@@ -140,7 +153,10 @@ const instantiateBackend = (
     case 'imagesnap':
       return new ImageSnapWebcam(config)
     case 'windows': {
-      const windowsConfig = hasOwn(requestedOptions, 'output')
+      const hasRequestedOutput =
+        hasOwn(requestedOptions, 'output') &&
+        !hasMaterializedDefaultOutput(requestedOptions)
+      const windowsConfig = hasRequestedOutput
         ? config
         : { ...config, output: undefined }
 

@@ -9,6 +9,7 @@ import {
   clearBackendCaches,
   clearBackendSelectionCache,
   create,
+  defaults,
   FSWebcam,
   ImageSnapWebcam,
   WebcamError,
@@ -364,6 +365,22 @@ describe('create', () => {
     }
   })
 
+  it('treats materialized default output as omitted for CommandCam fallback', () => {
+    mock.method(os, 'platform', () => 'win32')
+    mock.method(FFmpegWebcam, 'isAvailable', () => false)
+    const { cleanup, commandCamPath } = createCommandCamFixture()
+    process.env.NODE_WEBCAM_COMMANDCAM_PATH = commandCamPath
+
+    try {
+      const webcam = create({ ...defaults })
+
+      assert.ok(webcam instanceof WindowsWebcam)
+      assert.equal(webcam.options.output, 'bmp')
+    } finally {
+      cleanup()
+    }
+  })
+
   it('uses a backend-compatible default capture location on Windows', async () => {
     mock.method(os, 'platform', () => 'win32')
     mock.method(FFmpegWebcam, 'isAvailable', () => false)
@@ -469,6 +486,24 @@ describe('create', () => {
 
     try {
       assert.throws(() => create({ output: 'jpg' }), {
+        code: 'UNSUPPORTED_OUTPUT_FORMAT',
+        message:
+          'CommandCam only supports bmp output. Install ffmpeg for jpeg, jpg, or png capture on Windows.',
+        name: 'WebcamError'
+      })
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('rejects explicit default jpeg output when Windows falls back to CommandCam', () => {
+    mock.method(os, 'platform', () => 'win32')
+    mock.method(FFmpegWebcam, 'isAvailable', () => false)
+    const { cleanup, commandCamPath } = createCommandCamFixture()
+    process.env.NODE_WEBCAM_COMMANDCAM_PATH = commandCamPath
+
+    try {
+      assert.throws(() => create({ output: 'jpeg' }), {
         code: 'UNSUPPORTED_OUTPUT_FORMAT',
         message:
           'CommandCam only supports bmp output. Install ffmpeg for jpeg, jpg, or png capture on Windows.',
