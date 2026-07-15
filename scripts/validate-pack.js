@@ -24,7 +24,8 @@ const requiredPackageEntries = [
   'dist/esm/package.json',
   'dist/types/index.d.ts',
   'package.json',
-  'prebuilds/native-manifest.json'
+  'prebuilds/native-manifest.json',
+  'static/node-webcam.png'
 ]
 const requiredNativeManifestSources = [
   'binding.gyp',

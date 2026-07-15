@@ -83,7 +83,8 @@
     "dist",
     "LICENSE",
     "prebuilds",
-    "README.md"
+    "README.md",
+    "static/node-webcam.png"
   ],
   "license": "MIT",
   "bugs": {

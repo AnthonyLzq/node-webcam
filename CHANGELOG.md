@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [2.2.0](https://github.com/AnthonyLzq/node-webcam/compare/v2.1.0...v2.2.0) (2023-03-12)
+
+
+### Features
+
+* implemented logo ([f070f76](https://github.com/AnthonyLzq/node-webcam/commit/f070f76ff1391fdacc9953f36df8f2295c5ecb7c))
+
 ## [2.1.0](https://github.com/AnthonyLzq/node-webcam/compare/v2.0.3...v2.1.0) (2023-01-14)
 
 

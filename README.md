@@ -1,5 +1,8 @@
-# [@anthonylzq/node-webcam](https://github.com/AnthonyLzq/node-webcam)
+<div align="center">
+  <img src="./static/node-webcam.png" alt="TypeScript Project Generator">
+</div>
 
+# [@anthonylzq/node-webcam](https://github.com/AnthonyLzq/node-webcam)
 Cross platform webcam usage
 
 ## Install
