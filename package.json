@@ -13,6 +13,7 @@
     "build:esm": "tsc -p tsconfig.esm.json",
     "build:types": "tsc -p tsconfig.types.json",
     "benchmark:capture": "npm run native:build && ts-node benchmarks/capture-backends.ts",
+    "changelog": "node scripts/update-changelog.js",
     "check": "npm run typecheck && npm run lint:check && npm test",
     "setup:windows": "node ./bin/node-webcam.js setup windows",
     "demo": "npm run build && ts-node examples/websocket/App.ts",
