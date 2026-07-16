@@ -1,23 +1,20 @@
 name: Changelog
 
 on:
-  pull_request:
-    types: [opened, reopened, synchronize, ready_for_review]
+  push:
+    branches:
+      - master
   workflow_dispatch:
 
 permissions:
   contents: write
-  pull-requests: read
 
 jobs:
   update-changelog:
     name: Update changelog
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     env:
-      TARGET_REF: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.ref || github.ref_name }}
+      TARGET_REF: ${{ github.ref_name }}
     steps:
       - uses: actions/checkout@v4
         with:
